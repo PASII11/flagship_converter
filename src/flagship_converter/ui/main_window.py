@@ -1,5 +1,4 @@
 """Главное окно приложения."""
-
 from __future__ import annotations
 
 from pathlib import Path
@@ -7,22 +6,19 @@ from pathlib import Path
 from PySide6.QtCore import QThreadPool
 from PySide6.QtWidgets import (
     QCheckBox,
-    QComboBox,
     QFileDialog,
     QHBoxLayout,
     QLabel,
-    QListWidget,
-    QListWidgetItem,
     QMainWindow,
     QPushButton,
-    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
 
 from flagship_converter.core.engine import ConversionEngine
+from flagship_converter.core.models import ConversionPlan, JobStatus
 from flagship_converter.ui.widgets.drop_zone import DropZone
-from flagship_converter.ui.widgets.job_item import JobItemWidget
+from flagship_converter.ui.widgets.task_queue import TaskQueue
 from flagship_converter.ui.workers import PlanRunner
 
 
@@ -30,140 +26,111 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("Flagship File Converter")
-        self.setMinimumSize(850, 600)
+        self.setMinimumSize(900, 640)
 
-        self._engine = ConversionEngine()
-        self._output_dir: Path | None = None
-        self._dropped_files: list[str] = []
-        self._cancel_flag: list[bool] = [False]
-        self._job_widgets: dict[str, JobItemWidget] = {}
+        self._engine        = ConversionEngine()
+        self._output_dir:  Path | None = None
+        self._cancel_flag: list[bool]  = [False]
+
+        # job_id → card_id: связь между задачами движка и карточками UI
+        self._job_card_map: dict[str, str] = {}
 
         self._build_ui()
+
+    # ------------------------------------------------------------------
+    # Построение UI
+    # ------------------------------------------------------------------
 
     def _build_ui(self) -> None:
         root = QWidget()
         self.setCentralWidget(root)
         layout = QVBoxLayout(root)
         layout.setContentsMargins(16, 16, 16, 16)
-        layout.setSpacing(10)
+        layout.setSpacing(8)
 
+        # --- Drop Zone ---
         self._drop_zone = DropZone()
         self._drop_zone.files_dropped.connect(self._on_files_dropped)
+        self._drop_zone.setMaximumHeight(110)
         layout.addWidget(self._drop_zone)
 
-        # --- Settings bar 1 ---
-        settings_bar = QHBoxLayout()
+        # --- Toolbar: Add Files / Clear All ---
+        toolbar = QHBoxLayout()
+        add_btn = QPushButton("➕ Добавить файлы")
+        add_btn.clicked.connect(self._on_add_files_clicked)
+        self._clear_btn = QPushButton("🗑 Очистить всё")
+        self._clear_btn.clicked.connect(self._on_clear_all)
+        self._clear_btn.setEnabled(False)
+        toolbar.addWidget(add_btn)
+        toolbar.addWidget(self._clear_btn)
+        toolbar.addStretch()
+        self._files_count_label = QLabel("Файлов: 0")
+        self._files_count_label.setStyleSheet("color: #8B92B8;")
+        toolbar.addWidget(self._files_count_label)
+        layout.addLayout(toolbar)
 
-        settings_bar.addWidget(QLabel("Формат:"))
-        self._format_box = QComboBox()
-        self._format_box.addItems([
-            "webp", "jpg", "png",
-            "mp3", "wav", "flac", "aac", "ogg",
-            "mp4", "mkv", "avi", "webm",
-            "pdf", "docx", "md"
-        ])
-        self._format_box.currentTextChanged.connect(self._on_format_changed)
-        settings_bar.addWidget(self._format_box)
+        # --- Task Queue ---
+        self._task_queue = TaskQueue()
+        self._task_queue.files_changed.connect(self._on_files_changed)
+        layout.addWidget(self._task_queue, stretch=1)
 
-        self._quality_label = QLabel("Качество:")
-        self._quality_spin = QSpinBox()
-        self._quality_spin.setRange(1, 95)
-        self._quality_spin.setValue(85)
-        settings_bar.addWidget(self._quality_label)
-        settings_bar.addWidget(self._quality_spin)
-
-        self._lossless_cb = QCheckBox("Lossless")
-        settings_bar.addWidget(self._lossless_cb)
-
-        self._audio_bitrate_label = QLabel("Аудио:")
-        self._audio_bitrate_box = QComboBox()
-        self._audio_bitrate_box.addItems(["128k", "192k", "256k", "320k"])
-        self._audio_bitrate_box.setCurrentText("192k")
-        settings_bar.addWidget(self._audio_bitrate_label)
-        settings_bar.addWidget(self._audio_bitrate_box)
-
-        self._video_bitrate_label = QLabel("Видео:")
-        self._video_bitrate_box = QComboBox()
-        self._video_bitrate_box.addItems(["1M", "2.5M", "5M", "10M", "20M"])
-        self._video_bitrate_box.setCurrentText("2.5M")
-        settings_bar.addWidget(self._video_bitrate_label)
-        settings_bar.addWidget(self._video_bitrate_box)
-
-        self._video_codec_label = QLabel("Кодек:")
-        self._video_codec_box = QComboBox()
-        self._video_codec_box.addItems(
-            ["Авто (CPU x264)", "AMD (AMF)", "NVIDIA (NVENC)", "Intel (QSV)"]
-        )
-        settings_bar.addWidget(self._video_codec_label)
-        settings_bar.addWidget(self._video_codec_box)
-
-        settings_bar.addStretch()
-        layout.addLayout(settings_bar)
-
-        # --- Settings bar 2 ---
-        folder_bar = QHBoxLayout()
-        self._overwrite_cb = QCheckBox("Перезаписать если существует")
-        folder_bar.addWidget(self._overwrite_cb)
-
-        self._folder_btn = QPushButton("Выбрать папку…")
+        # --- Нижняя панель: папка + перезапись ---
+        bottom_bar = QHBoxLayout()
+        self._folder_btn = QPushButton("📁 Выбрать папку вывода...")
         self._folder_btn.clicked.connect(self._choose_output_dir)
-        self._folder_label = QLabel("Папка: (по умолчанию — рядом с файлами)")
-        folder_bar.addWidget(self._folder_btn)
-        folder_bar.addWidget(self._folder_label)
-        folder_bar.addStretch()
-        layout.addLayout(folder_bar)
+        self._folder_label = QLabel("Папка: рядом с исходными файлами")
+        self._folder_label.setStyleSheet("color: #8B92B8; font-size: 11px;")
+        self._overwrite_cb = QCheckBox("Перезаписать если существует")
+        bottom_bar.addWidget(self._folder_btn)
+        bottom_bar.addWidget(self._folder_label)
+        bottom_bar.addStretch()
+        bottom_bar.addWidget(self._overwrite_cb)
+        layout.addLayout(bottom_bar)
 
-        # --- Action buttons ---
-        btn_bar = QHBoxLayout()
-        self._convert_btn = QPushButton("▶  Конвертировать")
+        # --- Кнопки действий ---
+        action_bar = QHBoxLayout()
+        self._convert_btn = QPushButton("▶ Конвертировать всё")
         self._convert_btn.setEnabled(False)
+        self._convert_btn.setFixedHeight(36)
+        self._convert_btn.setStyleSheet(
+            "QPushButton { background-color: #7C83FD; color: white; border-radius: 6px;"
+            "  font-size: 13px; font-weight: bold; }"
+            "QPushButton:hover { background-color: #9199FE; }"
+            "QPushButton:disabled { background-color: #2E3250; color: #5C6380; }"
+        )
         self._convert_btn.clicked.connect(self._start_conversion)
-        self._cancel_btn = QPushButton("✕  Отмена")
+
+        self._cancel_btn = QPushButton("✕ Отмена")
         self._cancel_btn.setEnabled(False)
+        self._cancel_btn.setFixedHeight(36)
         self._cancel_btn.clicked.connect(self._cancel_conversion)
-        btn_bar.addWidget(self._convert_btn)
-        btn_bar.addWidget(self._cancel_btn)
-        btn_bar.addStretch()
-        layout.addLayout(btn_bar)
 
-        self._job_list = QListWidget()
-        self._job_list.setSpacing(4)
-        layout.addWidget(self._job_list)
+        action_bar.addWidget(self._convert_btn)
+        action_bar.addWidget(self._cancel_btn)
+        action_bar.addStretch()
+        layout.addLayout(action_bar)
 
-        self.statusBar().showMessage("Перетащите файлы для начала работы")
-        self._on_format_changed(self._format_box.currentText())
+        self.statusBar().showMessage("Перетащите файлы или нажмите «Добавить файлы»")
 
-    def _on_format_changed(self, fmt: str) -> None:
-        is_photo = fmt in ("jpg", "webp", "png")
-        is_audio = fmt in ("mp3", "wav", "flac", "aac", "ogg")
-        is_video = fmt in ("mp4", "mkv", "avi", "webm")
-
-        self._quality_label.setVisible(is_photo and fmt != "png")
-        self._quality_spin.setVisible(is_photo and fmt != "png")
-        self._lossless_cb.setVisible(fmt == "webp")
-
-        self._audio_bitrate_label.setVisible(is_audio and fmt not in ("wav", "flac"))
-        self._audio_bitrate_box.setVisible(is_audio and fmt not in ("wav", "flac"))
-
-        self._video_bitrate_label.setVisible(is_video)
-        self._video_bitrate_box.setVisible(is_video)
-        self._video_codec_label.setVisible(is_video and fmt != "webm")
-        self._video_codec_box.setVisible(is_video and fmt != "webm")
+    # ------------------------------------------------------------------
+    # Слоты: управление файлами
+    # ------------------------------------------------------------------
 
     def _on_files_dropped(self, paths: list[str]) -> None:
-        self._dropped_files = paths
-        self._job_list.clear()
-        self._job_widgets.clear()
+        self._task_queue.add_files(paths)
 
-        for p in paths:
-            item = QListWidgetItem(self._job_list)
-            widget = JobItemWidget(Path(p).name, self._format_box.currentText())
-            item.setSizeHint(widget.sizeHint())
-            self._job_list.addItem(item)
-            self._job_list.setItemWidget(item, widget)
+    def _on_add_files_clicked(self) -> None:
+        paths, _ = QFileDialog.getOpenFileNames(self, "Выберите файлы для конвертации")
+        if paths:
+            self._task_queue.add_files(paths)
 
-        self._convert_btn.setEnabled(bool(paths))
-        self.statusBar().showMessage(f"Файлов добавлено: {len(paths)}")
+    def _on_clear_all(self) -> None:
+        self._task_queue.clear_all()
+
+    def _on_files_changed(self, count: int) -> None:
+        self._files_count_label.setText(f"Файлов: {count}")
+        self._convert_btn.setEnabled(count > 0)
+        self._clear_btn.setEnabled(count > 0)
 
     def _choose_output_dir(self) -> None:
         folder = QFileDialog.getExistingDirectory(self, "Выберите папку для сохранения")
@@ -171,41 +138,44 @@ class MainWindow(QMainWindow):
             self._output_dir = Path(folder)
             self._folder_label.setText(f"Папка: {folder}")
 
+    # ------------------------------------------------------------------
+    # Слоты: конвертация
+    # ------------------------------------------------------------------
+
     def _start_conversion(self) -> None:
-        if not self._dropped_files:
+        cards = self._task_queue.cards()
+        if not cards:
             return
 
-        output_dir = self._output_dir or (Path(self._dropped_files[0]).parent / "converted")
-        target_ext = self._format_box.currentText()
-        plan = self._engine.build_plan(
-            paths=self._dropped_files,
-            output_dir=output_dir,
-            target_ext=target_ext,
-            overwrite=self._overwrite_cb.isChecked(),
-            quality=self._quality_spin.value(),
-            lossless_webp=self._lossless_cb.isChecked(),
-            audio_bitrate=self._audio_bitrate_box.currentText(),
-            video_bitrate=self._video_bitrate_box.currentText(),
-            video_codec=self._video_codec_box.currentText(),
-        )
+        plan = ConversionPlan()
+        self._job_card_map.clear()
+        overwrite = self._overwrite_cb.isChecked()
+
+        for card in cards:
+            if not card.is_convertible():
+                continue
+            output_dir = self._output_dir or (card.file_path.parent / "converted")
+            job = self._engine.build_job(
+                file_path  = card.file_path,
+                output_dir = output_dir,
+                target_ext = card.target_ext,
+                overwrite  = overwrite,
+                params     = card.job_params,
+            )
+            if job:
+                plan.jobs.append(job)
+                self._job_card_map[job.id] = card.card_id
+                card.set_status(JobStatus.PENDING)
+                card.set_progress(0)
 
         if not plan.jobs:
             self.statusBar().showMessage("Нет файлов для конвертации (неподдерживаемые форматы?)")
             return
 
-        self._job_list.clear()
-        self._job_widgets.clear()
-        for job in plan.jobs:
-            item = QListWidgetItem(self._job_list)
-            widget = JobItemWidget(job.input_path.name, target_ext)
-            item.setSizeHint(widget.sizeHint())
-            self._job_list.addItem(item)
-            self._job_list.setItemWidget(item, widget)
-            self._job_widgets[job.id] = widget
-
         self._cancel_flag[0] = False
         self._convert_btn.setEnabled(False)
         self._cancel_btn.setEnabled(True)
+        self._task_queue.lock_all(True)
         self.statusBar().showMessage(f"Конвертация {plan.total} файлов…")
 
         runner = PlanRunner(plan, self._engine, self._cancel_flag)
@@ -221,24 +191,43 @@ class MainWindow(QMainWindow):
         self._cancel_btn.setEnabled(False)
         self.statusBar().showMessage("Отмена…")
 
+    # ------------------------------------------------------------------
+    # Слоты: обновление карточек по job_id
+    # ------------------------------------------------------------------
+
+    def _get_card_by_job(self, job_id: str):
+        card_id = self._job_card_map.get(job_id)
+        return self._task_queue.get_card(card_id) if card_id else None
+
     def _on_job_started(self, job_id: str) -> None:
-        if widget := self._job_widgets.get(job_id):
-            widget.set_status("🔄 Конвертация...", "#7C83FD")
+        if card := self._get_card_by_job(job_id):
+            card.set_status(JobStatus.RUNNING)
 
     def _on_job_progress(self, job_id: str, percent: int) -> None:
-        if widget := self._job_widgets.get(job_id):
-            widget.set_progress(percent)
+        if card := self._get_card_by_job(job_id):
+            card.set_progress(percent)
 
     def _on_job_finished(self, job_id: str) -> None:
-        if widget := self._job_widgets.get(job_id):
-            widget.set_progress(100)
-            widget.set_status("✅ Готово", "#4CAF50")
+        if card := self._get_card_by_job(job_id):
+            card.set_progress(100)
+            card.set_status(JobStatus.DONE)
 
     def _on_job_failed(self, job_id: str, error: str) -> None:
-        if widget := self._job_widgets.get(job_id):
-            widget.set_status("❌ Ошибка", "#F44336")
+        if card := self._get_card_by_job(job_id):
+            card.set_status(JobStatus.FAILED)
+        self.statusBar().showMessage(f"Ошибка: {error[:120]}")
 
     def _on_all_done(self) -> None:
         self._convert_btn.setEnabled(True)
         self._cancel_btn.setEnabled(False)
-        self.statusBar().showMessage("Готово! Проверьте папку назначения.")
+        self._task_queue.lock_all(False)
+        total  = len(self._job_card_map)
+        done   = sum(
+            1 for cid in self._job_card_map.values()
+            if (c := self._task_queue.get_card(cid)) and c._status == JobStatus.DONE
+        )
+        failed = total - done
+        msg = f"Готово: {done}/{total}"
+        if failed:
+            msg += f"  |  ❌ Ошибок: {failed}"
+        self.statusBar().showMessage(msg)

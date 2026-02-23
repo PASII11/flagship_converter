@@ -1,5 +1,4 @@
 """Модели данных для задач конвертации."""
-
 from __future__ import annotations
 
 import uuid
@@ -24,6 +23,7 @@ class ConversionJob:
     output_path: Path
     converter: str
     params: dict[str, object]
+    target_ext: str = ""          # ← NEW: каждый job знает свой формат
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     status: JobStatus = JobStatus.PENDING
     error: str | None = None

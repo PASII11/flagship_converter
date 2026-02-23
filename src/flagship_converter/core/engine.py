@@ -1,5 +1,4 @@
 """Движок конвертации: сборка плана и выполнение задач."""
-
 from __future__ import annotations
 
 from collections.abc import Callable, Iterable
@@ -32,6 +31,31 @@ class ConversionEngine:
                 pass
         return result
 
+    # --- NEW: построить одну задачу с индивидуальными настройками ---
+    def build_job(
+        self,
+        file_path: Path,
+        output_dir: Path,
+        target_ext: str,
+        overwrite: bool,
+        params: dict[str, object],
+    ) -> ConversionJob | None:
+        """Построить задачу для одного файла. Возвращает None если формат не поддерживается."""
+        for converter in self._converters:
+            if converter.can_handle(file_path):
+                output_path = converter.build_output_path(
+                    file_path, output_dir, target_ext, overwrite
+                )
+                return ConversionJob(
+                    input_path=file_path,
+                    output_path=output_path,
+                    converter=type(converter).__name__,
+                    params=params,
+                    target_ext=target_ext,
+                )
+        return None
+
+    # --- Устаревший метод, оставлен для обратной совместимости / тестов ---
     def build_plan(
         self,
         paths: Iterable[str | Path],
@@ -53,23 +77,10 @@ class ConversionEngine:
             "video_bitrate": video_bitrate,
             "video_codec": video_codec,
         }
-
         for file_path in files:
-            for converter in self._converters:
-                if converter.can_handle(file_path):
-                    output_path = converter.build_output_path(
-                        file_path, output_dir, target_ext, overwrite
-                    )
-                    plan.jobs.append(
-                        ConversionJob(
-                            input_path=file_path,
-                            output_path=output_path,
-                            converter=type(converter).__name__,
-                            params=params,
-                        )
-                    )
-                    break
-
+            job = self.build_job(file_path, output_dir, target_ext, overwrite, params)
+            if job:
+                plan.jobs.append(job)
         return plan
 
     def execute_plan(
