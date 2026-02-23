@@ -1,5 +1,4 @@
 """Скрипт сборки приложения в .exe файл."""
-
 import os
 import shutil
 import subprocess
@@ -31,6 +30,7 @@ def main():
         "--windowed", # Отключаем консоль, это решает баг с Drag&Drop (UAC)
         "--add-binary=build_tools/ffmpeg.exe;.",
         "--add-binary=build_tools/wkhtmltopdf.exe;.",
+
         # Собираем все скрытые файлы, DLL и папки с ресурсами
         "--collect-all=docling",
         "--collect-all=docling_parse",
@@ -41,7 +41,15 @@ def main():
         "--collect-all=spacy",
         "--collect-all=transformers",
         "--collect-all=pydantic",
+
+        # --- ФИКС ОШИБКИ RAPID OCR ---
+        "--collect-all=rapidocr_onnxruntime",
+        "--collect-all=onnxruntime",
+        "--collect-all=rapid",
+
         "--hidden-import=pytorch",
+        "--hidden-import=rapidocr_onnxruntime",
+
         # Копируем текстовые метаданные (версии)
         "--copy-metadata=docling",
         "--copy-metadata=docling-core",
@@ -50,6 +58,8 @@ def main():
         "--copy-metadata=pypdfium2",
         "--copy-metadata=torch",
         "--copy-metadata=torchvision",
+        "--copy-metadata=rapidocr_onnxruntime",
+
         "src/flagship_converter/app.py"
     ]
 
