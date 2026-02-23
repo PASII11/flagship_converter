@@ -1,10 +1,11 @@
 """Общие утилиты для работы с медиа и внешними бинарниками."""
-
 from __future__ import annotations
 
+import queue
 import re
 import subprocess
 import sys
+import threading
 from collections.abc import Callable
 from pathlib import Path
 
@@ -49,12 +50,21 @@ def get_wkhtmltopdf_path() -> str:
     )
 
 
+def _enqueue_output(out_stream: object, q: queue.Queue[str]) -> None:
+    """Фоновый поток для непрерывного чтения вывода процесса без блокировки."""
+    # Используем iter для чтения до EOF (пустой строки)
+    for line in iter(out_stream.readline, ""):  # type: ignore[attr-defined]
+        if line:
+            q.put(line)
+    out_stream.close()  # type: ignore[attr-defined]
+
+
 def run_ffmpeg(
     cmd: list[str],
     cancel_cb: Callable[[], bool],
     progress_cb: Callable[[int], None] | None = None,
 ) -> None:
-    """Запустить FFmpeg в фоне с парсингом прогресса."""
+    """Запустить FFmpeg в фоне с потокобезопасным чтением прогресса."""
     creationflags = 0
     if sys.platform == "win32":
         creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
@@ -67,49 +77,68 @@ def run_ffmpeg(
         creationflags=creationflags,
         encoding="utf-8",
         errors="replace",
+        bufsize=1,  # Построчная буферизация
     )
+
+    if not process.stderr:
+        raise RuntimeError("Не удалось открыть stderr процесса FFmpeg")
+
+    # Создаем очередь и запускаем поток-читатель
+    q: queue.Queue[str] = queue.Queue()
+    t = threading.Thread(target=_enqueue_output, args=(process.stderr, q), daemon=True)
+    t.start()
 
     error_log: list[str] = []
     total_seconds = 0.0
 
     while True:
+        # 1. Проверяем флаг отмены из UI
         if cancel_cb():
             process.terminate()
             process.wait()
             return
 
-        if process.stderr:
-            line = process.stderr.readline()
-            if not line and process.poll() is not None:
+        # 2. Неблокирующее чтение из очереди
+        try:
+            line = q.get(timeout=0.1)
+        except queue.Empty:
+            # Очередь пуста. Если процесс завершен — выходим из цикла
+            if process.poll() is not None:
                 break
-            if not line:
-                continue
+            continue
 
-            error_log.append(line.strip())
-            if len(error_log) > 20:
-                error_log.pop(0)
+        line = line.strip()
+        if not line:
+            continue
 
-            if progress_cb:
-                if total_seconds == 0.0:
-                    dur_match = DURATION_RE.search(line)
-                    if dur_match:
-                        total_seconds = _time_to_seconds(
-                            dur_match.group("hours"),
-                            dur_match.group("minutes"),
-                            dur_match.group("seconds"),
-                        )
-                else:
-                    time_match = TIME_RE.search(line)
-                    if time_match:
-                        current_sec = _time_to_seconds(
-                            time_match.group("hours"),
-                            time_match.group("minutes"),
-                            time_match.group("seconds"),
-                        )
-                        percent = min(int((current_sec / total_seconds) * 100), 100)
-                        progress_cb(percent)
+        error_log.append(line)
+        if len(error_log) > 20:
+            error_log.pop(0)
+
+        # 3. Парсинг прогресса
+        if progress_cb:
+            if total_seconds == 0.0:
+                dur_match = DURATION_RE.search(line)
+                if dur_match:
+                    total_seconds = _time_to_seconds(
+                        dur_match.group("hours"),
+                        dur_match.group("minutes"),
+                        dur_match.group("seconds"),
+                    )
+            else:
+                time_match = TIME_RE.search(line)
+                if time_match:
+                    current_sec = _time_to_seconds(
+                        time_match.group("hours"),
+                        time_match.group("minutes"),
+                        time_match.group("seconds"),
+                    )
+                    percent = min(int((current_sec / total_seconds) * 100), 100)
+                    progress_cb(percent)
 
     process.wait()
+    t.join(timeout=1.0)  # Даем потоку секунду на корректное завершение
+
     if process.returncode != 0 and not cancel_cb():
         err_str = "\n".join(error_log)
         raise RuntimeError(f"FFmpeg error (code {process.returncode}):\n{err_str}")
