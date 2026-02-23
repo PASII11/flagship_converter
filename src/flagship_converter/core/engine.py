@@ -1,6 +1,9 @@
-"""Движок конвертации: сборка плана и выполнение задач."""
+"""Движок конвертации: сборка плана и выполнение задач с умной многопоточностью."""
 from __future__ import annotations
 
+import concurrent.futures
+import os
+from collections import defaultdict
 from collections.abc import Callable, Iterable
 from pathlib import Path
 
@@ -31,7 +34,6 @@ class ConversionEngine:
                 pass
         return result
 
-    # --- NEW: построить одну задачу с индивидуальными настройками ---
     def build_job(
         self,
         file_path: Path,
@@ -55,7 +57,6 @@ class ConversionEngine:
                 )
         return None
 
-    # --- Устаревший метод, оставлен для обратной совместимости / тестов ---
     def build_plan(
         self,
         paths: Iterable[str | Path],
@@ -94,34 +95,34 @@ class ConversionEngine:
     ) -> None:
         converter_map = {type(c).__name__: c for c in self._converters}
 
+        # Шаг 1. Группируем задачи по типам конвертеров (для разного уровня параллелизма)
+        jobs_by_converter: dict[str, list[ConversionJob]] = defaultdict(list)
         for job in plan.jobs:
             if cancel_cb():
                 job.status = JobStatus.CANCELLED
                 continue
+            jobs_by_converter[job.converter].append(job)
 
-            converter = converter_map.get(job.converter)
-            if converter is None:
-                job.status = JobStatus.FAILED
-                job.error = f"Конвертер '{job.converter}' не найден"
-                on_job_failed(job.id, job.error)
-                continue
+        # Функция, которая будет крутиться в отдельном потоке
+        def _process_job(job: ConversionJob, converter: object) -> None:
+            if cancel_cb():
+                job.status = JobStatus.CANCELLED
+                return
 
             job.status = JobStatus.RUNNING
             on_job_started(job.id)
 
-            def make_progress_cb(jid: str) -> Callable[[int], None]:
-                def cb(percent: int) -> None:
-                    if on_job_progress:
-                        on_job_progress(jid, percent)
-                return cb
+            def progress_hook(percent: int) -> None:
+                if on_job_progress:
+                    on_job_progress(job.id, percent)
 
             try:
-                converter.convert(
+                converter.convert(  # type: ignore[attr-defined]
                     job.input_path,
                     job.output_path,
                     job.params,
                     cancel_cb,
-                    make_progress_cb(job.id) if on_job_progress else None,
+                    progress_hook
                 )
                 job.status = JobStatus.DONE
                 on_job_finished(job.id)
@@ -129,3 +130,40 @@ class ConversionEngine:
                 job.status = JobStatus.FAILED
                 job.error = str(e)
                 on_job_failed(job.id, job.error)
+
+        # Получаем количество ядер, чтобы масштабировать обработку изображений
+        cpu_cores = os.cpu_count() or 4
+
+        # Шаг 2. Выполняем каждую группу с её собственным лимитом потоков
+        for conv_name, jobs in jobs_by_converter.items():
+            if cancel_cb():
+                break
+
+            converter = converter_map.get(conv_name)
+            if not converter:
+                for j in jobs:
+                    j.status = JobStatus.FAILED
+                    j.error = f"Конвертер '{conv_name}' не найден"
+                    on_job_failed(j.id, j.error)
+                continue
+
+            # Балансировка нагрузки: определяем сколько задач можно запустить одновременно
+            if conv_name == "ImageConverter":
+                workers = cpu_cores  # Картинки отлично параллелятся, загружаем все ядра
+            elif conv_name == "AudioConverter":
+                workers = min(4, cpu_cores)  # Аудио упирается в скорость диска
+            elif conv_name == "VideoConverter":
+                workers = 2  # Видео требует много ресурсов, сам FFmpeg внутри многопоточный
+            else:
+                workers = 1  # DocConverter: строго 1 поток во избежание OOM и багов PyInstaller
+
+            with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+                futures = [pool.submit(_process_job, job, converter) for job in jobs]
+
+                # Ждем завершения этого батча, прежде чем переходить к следующему типу файлов
+                for future in concurrent.futures.as_completed(futures):
+                    try:
+                        future.result()
+                    except Exception:
+                        # Исключения уже перехвачены внутри _process_job, так что просто идем дальше
+                        pass
