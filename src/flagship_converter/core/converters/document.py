@@ -1,22 +1,24 @@
 """Конвертер документов (PDF, DOCX, MD) на базе Docling и pdfkit."""
-
 from __future__ import annotations
 
+import gc
 import os
+import shutil
 from collections.abc import Callable
 from pathlib import Path
 
 import markdown
 import pdfkit
 from docx import Document
-from docling.document_converter import DocumentConverter
 
 # Жизненно важные настройки для HuggingFace на Windows без админа
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 os.environ["HUGGINGFACE_HUB_VERBOSITY"] = "error"
+# ЖЕСТКО отключаем скрытый мультипроцессинг, который ломает PyInstaller
+os.environ["LOKY_MAX_CPU_COUNT"] = "1"
+os.environ["OMP_NUM_THREADS"] = "1"
 
 # Патчим симлинки до любых других импортов
-import shutil
 import huggingface_hub.file_download as _hf_fd
 
 def _safe_symlink(src: str, dst: str, **kwargs: object) -> None:
@@ -29,11 +31,6 @@ def _safe_symlink(src: str, dst: str, **kwargs: object) -> None:
 
 _hf_fd._create_symlink = _safe_symlink  # type: ignore[attr-defined]
 
-
-from docling.datamodel.base_models import DocumentStream
-from docling.datamodel.pipeline_options import PipelineOptions
-from docling.document_converter import DocumentConverter, PdfFormatOption
-
 from flagship_converter.core.converters.base import safe_output_path
 from flagship_converter.core.converters.media import get_wkhtmltopdf_path
 
@@ -45,21 +42,9 @@ class DocConverter:
     """Конвертирует документы с сохранением структуры (PyInstaller-safe)."""
 
     def __init__(self) -> None:
-        from docling.datamodel.accelerator_options import AcceleratorOptions
-        from docling.datamodel.pipeline_options import PdfPipelineOptions
-        from docling.document_converter import PdfFormatOption
-
-        # Ограничиваем потоки — критично для PyInstaller и стабильности в GUI
-        accelerator_options = AcceleratorOptions(num_threads=1)
-
-        pipeline_options = PdfPipelineOptions()
-        pipeline_options.accelerator_options = accelerator_options
-
-        self._doc_converter = DocumentConverter(
-            format_options={
-                "pdf": PdfFormatOption(pipeline_options=pipeline_options)
-            }
-        )
+        # Мы БОЛЬШЕ НЕ храним DocumentConverter как атрибут класса!
+        # Иначе pypdfium2 крашится при закрытии скомпилированного .exe
+        pass
 
     def can_handle(self, path: Path) -> bool:
         return path.suffix.lower() in SUPPORTED_INPUT
@@ -91,12 +76,34 @@ class DocConverter:
         if progress_cb:
             progress_cb(10)
 
-        # 1. Читаем исходник в Markdown (прямой вызов, без multiprocessing)
+        # 1. Читаем исходник (локальная инициализация для защиты памяти)
         if input_path.suffix.lower() == ".md":
             md_text = input_path.read_text(encoding="utf-8")
         else:
-            conv_res = self._doc_converter.convert(str(input_path))
+            from docling.datamodel.accelerator_options import AcceleratorOptions
+            from docling.datamodel.pipeline_options import PdfPipelineOptions
+            from docling.document_converter import DocumentConverter, PdfFormatOption
+
+            # Ограничиваем потоки
+            accelerator_options = AcceleratorOptions(num_threads=1)
+            pipeline_options = PdfPipelineOptions()
+            pipeline_options.accelerator_options = accelerator_options
+
+            # Создаем конвертер ЛОКАЛЬНО
+            converter = DocumentConverter(
+                format_options={
+                    "pdf": PdfFormatOption(pipeline_options=pipeline_options)
+                }
+            )
+
+            conv_res = converter.convert(str(input_path))
             md_text = conv_res.document.export_to_markdown()
+
+            # ФИКС КРАША: Принудительно удаляем объекты C++ и вызываем Garbage Collector,
+            # чтобы pypdfium2 успел очистить память штатно.
+            del conv_res
+            del converter
+            gc.collect()
 
         if cancel_cb():
             return
@@ -112,11 +119,11 @@ class DocConverter:
             html_content = markdown.markdown(md_text, extensions=["tables"])
             full_html = f"""<!DOCTYPE html>
 <html><head><meta charset="utf-8"><style>
-    body {{ font-family: sans-serif; line-height: 1.5; padding: 20px; }}
-    table {{ border-collapse: collapse; width: 100%; margin-bottom: 20px; }}
-    th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
-    th {{ background-color: #f2f2f2; }}
-    img {{ max-width: 100%; }}
+body {{ font-family: sans-serif; line-height: 1.5; padding: 20px; }}
+table {{ border-collapse: collapse; width: 100%; margin-bottom: 20px; }}
+th, td {{ border: 1px solid #ddd; padding: 8px; text-align: left; }}
+th {{ background-color: #f2f2f2; }}
+img {{ max-width: 100%; }}
 </style></head><body>{html_content}</body></html>"""
 
             wk_path = get_wkhtmltopdf_path()
