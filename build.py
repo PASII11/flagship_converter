@@ -4,6 +4,9 @@ import shutil
 import subprocess
 from pathlib import Path
 
+# Импортируем проблемную библиотеку, чтобы физически найти её файлы
+import rapidocr_onnxruntime
+
 def main():
     FFMPEG_PATH = Path(shutil.which("ffmpeg") or "")
     WKHTML_PATH = Path(r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe")
@@ -21,17 +24,24 @@ def main():
     shutil.copy2(FFMPEG_PATH, build_dir / "ffmpeg.exe")
     shutil.copy2(WKHTML_PATH, build_dir / "wkhtmltopdf.exe")
 
+    # Находим реальный путь до папки rapidocr_onnxruntime
+    rapid_dir = os.path.dirname(rapidocr_onnxruntime.__file__)
+    print(f"📦 Найден rapidocr_onnxruntime по пути: {rapid_dir}")
+
     print("⚙️ Запускаем PyInstaller...")
 
     cmd = [
         "uv", "run", "pyinstaller",
         "--noconfirm",
         "--name=FlagshipConverter",
-        "--windowed", # Отключаем консоль, это решает баг с Drag&Drop (UAC)
+        "--windowed",
         "--add-binary=build_tools/ffmpeg.exe;.",
         "--add-binary=build_tools/wkhtmltopdf.exe;.",
 
-        # Собираем все скрытые файлы, DLL и папки с ресурсами
+        # ЖЕЛЕЗОБЕТОННЫЙ ФИКС: Ручное копирование всей папки rapidocr со всеми конфигами и моделями!
+        f"--add-data={rapid_dir};rapidocr_onnxruntime",
+
+        # Собираем все скрытые файлы
         "--collect-all=docling",
         "--collect-all=docling_parse",
         "--collect-all=docling_core",
@@ -41,16 +51,12 @@ def main():
         "--collect-all=spacy",
         "--collect-all=transformers",
         "--collect-all=pydantic",
-
-        # --- ФИКС ОШИБКИ RAPID OCR ---
-        "--collect-all=rapidocr_onnxruntime",
         "--collect-all=onnxruntime",
-        "--collect-all=rapid",
 
         "--hidden-import=pytorch",
         "--hidden-import=rapidocr_onnxruntime",
 
-        # Копируем текстовые метаданные (версии)
+        # Метаданные
         "--copy-metadata=docling",
         "--copy-metadata=docling-core",
         "--copy-metadata=docling-ibm-models",
@@ -58,7 +64,6 @@ def main():
         "--copy-metadata=pypdfium2",
         "--copy-metadata=torch",
         "--copy-metadata=torchvision",
-        "--copy-metadata=rapidocr_onnxruntime",
 
         "src/flagship_converter/app.py"
     ]
