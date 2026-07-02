@@ -10,10 +10,13 @@ from PIL import Image, UnidentifiedImageError
 from flagship_converter.core.converters.base import safe_output_path
 
 SUPPORTED_INPUT = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif", ".gif"}
+SUPPORTED_OUTPUT = {"png", "jpg", "jpeg", "webp", "bmp", "tiff"}
 
 
 class ImageConverter:
     """Конвертирует изображения между форматами через Pillow."""
+
+    supported_outputs = SUPPORTED_OUTPUT
 
     def can_handle(self, path: Path) -> bool:
         return path.suffix.lower() in SUPPORTED_INPUT

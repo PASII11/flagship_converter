@@ -1,47 +1,86 @@
-"""Скрипт сборки приложения в .exe файл."""
+"""Build the Windows executable with bundled local conversion tools."""
+from __future__ import annotations
+
+import importlib.util
 import os
 import shutil
 import subprocess
+import sys
 from pathlib import Path
 
-# Импортируем проблемную библиотеку, чтобы физически найти её файлы
-import rapidocr_onnxruntime
+DATA_SEP = ";" if os.name == "nt" else ":"
 
-def main():
-    FFMPEG_PATH = Path(shutil.which("ffmpeg") or "")
-    WKHTML_PATH = Path(r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe")
 
-    if not FFMPEG_PATH.exists():
-        raise FileNotFoundError("FFmpeg не найден в системе. Добавьте его в PATH.")
-    if not WKHTML_PATH.exists():
-        raise FileNotFoundError(f"wkhtmltopdf не найден по пути: {WKHTML_PATH}")
+def _required_binary(name: str, default_paths: list[Path] | None = None) -> Path:
+    found = shutil.which(name)
+    if found:
+        return Path(found)
 
-    print("✅ Бинарники найдены.")
+    for candidate in default_paths or []:
+        if candidate.exists():
+            return candidate
 
+    raise FileNotFoundError(f"Required binary was not found: {name}")
+
+
+def _package_dir(package: str) -> Path:
+    spec = importlib.util.find_spec(package)
+    if not spec or not spec.origin:
+        raise RuntimeError(f"Required package is not importable: {package}")
+    return Path(spec.origin).resolve().parent
+
+
+def _ensure_docling_models(build_dir: Path) -> Path:
+    models_dir = build_dir / "docling_models"
+    if models_dir.exists() and any(models_dir.iterdir()):
+        return models_dir
+
+    models_dir.mkdir(parents=True, exist_ok=True)
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "docling.cli.tools",
+            "models",
+            "download",
+            "--output-dir",
+            str(models_dir),
+        ],
+        check=True,
+    )
+    return models_dir
+
+
+def main() -> None:
     build_dir = Path("build_tools")
     build_dir.mkdir(exist_ok=True)
 
-    shutil.copy2(FFMPEG_PATH, build_dir / "ffmpeg.exe")
-    shutil.copy2(WKHTML_PATH, build_dir / "wkhtmltopdf.exe")
+    ffmpeg_path = _required_binary("ffmpeg")
+    wkhtml_path = _required_binary(
+        "wkhtmltopdf",
+        [
+            Path(r"C:\Program Files\wkhtmltopdf\bin\wkhtmltopdf.exe"),
+            Path(r"C:\Program Files (x86)\wkhtmltopdf\bin\wkhtmltopdf.exe"),
+        ],
+    )
 
-    # Находим реальный путь до папки rapidocr_onnxruntime
-    rapid_dir = os.path.dirname(rapidocr_onnxruntime.__file__)
-    print(f"📦 Найден rapidocr_onnxruntime по пути: {rapid_dir}")
+    shutil.copy2(ffmpeg_path, build_dir / "ffmpeg.exe")
+    shutil.copy2(wkhtml_path, build_dir / "wkhtmltopdf.exe")
 
-    print("⚙️ Запускаем PyInstaller...")
+    rapid_dir = _package_dir("rapidocr")
+    docling_models_dir = _ensure_docling_models(build_dir)
 
     cmd = [
-        "uv", "run", "pyinstaller",
+        sys.executable,
+        "-m",
+        "PyInstaller",
         "--noconfirm",
         "--name=FlagshipConverter",
         "--windowed",
-        "--add-binary=build_tools/ffmpeg.exe;.",
-        "--add-binary=build_tools/wkhtmltopdf.exe;.",
-
-        # ЖЕЛЕЗОБЕТОННЫЙ ФИКС: Ручное копирование всей папки rapidocr со всеми конфигами и моделями!
-        f"--add-data={rapid_dir};rapidocr_onnxruntime",
-
-        # Собираем все скрытые файлы
+        f"--add-binary={build_dir / 'ffmpeg.exe'}{DATA_SEP}.",
+        f"--add-binary={build_dir / 'wkhtmltopdf.exe'}{DATA_SEP}.",
+        f"--add-data={rapid_dir}{DATA_SEP}rapidocr",
+        f"--add-data={docling_models_dir}{DATA_SEP}docling_models",
         "--collect-all=docling",
         "--collect-all=docling_parse",
         "--collect-all=docling_core",
@@ -52,11 +91,8 @@ def main():
         "--collect-all=transformers",
         "--collect-all=pydantic",
         "--collect-all=onnxruntime",
-
-        "--hidden-import=pytorch",
-        "--hidden-import=rapidocr_onnxruntime",
-
-        # Метаданные
+        "--hidden-import=torch",
+        "--hidden-import=rapidocr",
         "--copy-metadata=docling",
         "--copy-metadata=docling-core",
         "--copy-metadata=docling-ibm-models",
@@ -64,13 +100,12 @@ def main():
         "--copy-metadata=pypdfium2",
         "--copy-metadata=torch",
         "--copy-metadata=torchvision",
-
-        "src/flagship_converter/app.py"
+        "src/flagship_converter/app.py",
     ]
 
     subprocess.run(cmd, check=True)
+    print("Build complete. See dist/FlagshipConverter.")
 
-    print("🚀 Сборка завершена! Ищите .exe в папке dist/FlagshipConverter")
 
 if __name__ == "__main__":
     main()

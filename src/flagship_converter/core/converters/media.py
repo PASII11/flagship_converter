@@ -3,11 +3,14 @@ from __future__ import annotations
 
 import queue
 import re
+import shutil
 import subprocess
 import sys
 import threading
 from collections.abc import Callable
 from pathlib import Path
+
+from flagship_converter.core.converters.base import ConversionCancelled
 
 # Регулярки для парсинга вывода FFmpeg
 DURATION_RE = re.compile(r"Duration:\s*(?P<hours>\d+):(?P<minutes>\d+):(?P<seconds>\d+\.\d+)")
@@ -28,15 +31,33 @@ def get_binary_path(name: str, win_default_paths: list[str] | None = None) -> st
         if bundle_path.exists():
             return str(bundle_path)
 
-    # 2. Ищем по дефолтным путям (только Windows)
+    # 2. Ищем в локальной папке сборочных бинарников при запуске из исходников.
+    local_tool = Path.cwd() / "build_tools" / exe_name
+    if local_tool.exists():
+        return str(local_tool)
+
+    try:
+        repo_tool = Path(__file__).resolve().parents[4] / "build_tools" / exe_name
+        if repo_tool.exists():
+            return str(repo_tool)
+    except IndexError:
+        pass
+
+    # 3. Ищем по дефолтным путям (только Windows)
     if sys.platform == "win32" and win_default_paths:
         for p in win_default_paths:
             full_path = Path(p) / exe_name
             if full_path.exists():
                 return str(full_path)
 
-    # 3. Возвращаем имя (надеемся, что оно есть в PATH)
-    return name
+    # 4. Ищем в PATH и явно сообщаем, если бинарника нет.
+    found = shutil.which(exe_name) or shutil.which(name)
+    if found:
+        return found
+
+    raise RuntimeError(
+        f"Required binary '{exe_name}' was not found in the app bundle, default paths, or PATH."
+    )
 
 
 def get_ffmpeg_path() -> str:
@@ -46,7 +67,10 @@ def get_ffmpeg_path() -> str:
 def get_wkhtmltopdf_path() -> str:
     return get_binary_path(
         "wkhtmltopdf",
-        win_default_paths=[r"C:\Program Files\wkhtmltopdf\bin", r"C:\Program Files (x86)\wkhtmltopdf\bin"]
+        win_default_paths=[
+            r"C:\Program Files\wkhtmltopdf\bin",
+            r"C:\Program Files (x86)\wkhtmltopdf\bin",
+        ],
     )
 
 
@@ -57,6 +81,18 @@ def _enqueue_output(out_stream: object, q: queue.Queue[str]) -> None:
         if line:
             q.put(line)
     out_stream.close()  # type: ignore[attr-defined]
+
+
+def _terminate_process(process: subprocess.Popen[str]) -> None:
+    process.terminate()
+    try:
+        process.wait(timeout=5)
+    except subprocess.TimeoutExpired:
+        process.kill()
+        try:
+            process.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            pass
 
 
 def run_ffmpeg(
@@ -81,6 +117,7 @@ def run_ffmpeg(
     )
 
     if not process.stderr:
+        _terminate_process(process)
         raise RuntimeError("Не удалось открыть stderr процесса FFmpeg")
 
     # Создаем очередь и запускаем поток-читатель
@@ -94,9 +131,9 @@ def run_ffmpeg(
     while True:
         # 1. Проверяем флаг отмены из UI
         if cancel_cb():
-            process.terminate()
-            process.wait()
-            return
+            _terminate_process(process)
+            t.join(timeout=1.0)
+            raise ConversionCancelled()
 
         # 2. Неблокирующее чтение из очереди
         try:

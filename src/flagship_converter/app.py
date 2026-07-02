@@ -1,5 +1,4 @@
 """Точка входа приложения."""
-
 from __future__ import annotations
 
 import multiprocessing
@@ -16,8 +15,16 @@ def main() -> None:
     multiprocessing.freeze_support()
 
     app = QApplication(sys.argv)
+
+    # ---------------------------------------------------------
+    # ЖЕЛЕЗОБЕТОННЫЙ ФИКС СТИЛЕЙ:
+    # Отключаем системный движок отрисовки Windows,
+    # который ломает наши кастомные QSS-стили.
+    # ---------------------------------------------------------
+    app.setStyle("Fusion")
+
     app.setApplicationName("Flagship File Converter")
-    app.setApplicationVersion("0.1.0")
+    app.setApplicationVersion("1.0.0")
 
     window = MainWindow()
     window.show()

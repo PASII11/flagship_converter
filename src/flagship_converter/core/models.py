@@ -24,6 +24,7 @@ class ConversionJob:
     converter: str
     params: dict[str, object]
     target_ext: str = ""          # ← NEW: каждый job знает свой формат
+    overwrite: bool = False
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     status: JobStatus = JobStatus.PENDING
     error: str | None = None

@@ -7,7 +7,13 @@ from pathlib import Path
 from typing import Protocol
 
 
+class ConversionCancelled(RuntimeError):
+    """Raised when a conversion is cancelled by the user."""
+
+
 class Converter(Protocol):
+    supported_outputs: set[str]
+
     def can_handle(self, path: Path) -> bool: ...
 
     def build_output_path(
