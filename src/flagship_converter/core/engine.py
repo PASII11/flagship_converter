@@ -16,13 +16,19 @@ from flagship_converter.core.models import ConversionJob, ConversionPlan, JobSta
 
 
 class ConversionEngine:
-    def __init__(self) -> None:
+    def __init__(self, max_workers: int | None = None) -> None:
+        self._max_workers = max_workers
         self._converters: list[Converter] = [
             ImageConverter(),
             AudioConverter(),
             VideoConverter(),
             DocConverter(),
         ]
+
+    def _effective_workers(self, computed: int) -> int:
+        if self._max_workers and self._max_workers > 0:
+            return max(1, min(computed, self._max_workers))
+        return computed
 
     def collect_files(self, paths: Iterable[str | Path]) -> list[Path]:
         result: list[Path] = []
@@ -230,7 +236,7 @@ class ConversionEngine:
             else:
                 workers = 1  # DocConverter: строго 1 поток во избежание OOM и багов PyInstaller
 
-            with concurrent.futures.ThreadPoolExecutor(max_workers=workers) as pool:
+            with concurrent.futures.ThreadPoolExecutor(max_workers=self._effective_workers(workers)) as pool:
                 futures = [pool.submit(_process_job, job, converter) for job in jobs]
 
                 # Ждем завершения этого батча, прежде чем переходить к следующему типу файлов

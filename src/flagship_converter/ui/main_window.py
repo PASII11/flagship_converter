@@ -34,7 +34,7 @@ class MainWindow(QMainWindow):
 
         self._settings = settings or AppSettings()
         self._store = store or PresetStore()
-        self._engine = engine or ConversionEngine()
+        self._engine = engine or ConversionEngine(max_workers=self._settings.max_workers or None)
         theme.set_theme_mode(self._settings.theme_mode)
 
         self._build_ui()
