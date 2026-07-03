@@ -69,6 +69,16 @@ def test_remove_row_via_signal(app, tmp_path):
     assert q.get_row(row.card_id) is None
 
 
+def test_pending_count_excludes_done(app, tmp_path):
+    from flagship_converter.core.models import JobStatus
+
+    q = TaskQueue()
+    q.add_files(_files(tmp_path))
+    q.rows()[0].set_status(JobStatus.DONE)
+    assert q.convertible_count() == 3
+    assert q.pending_count() == 2
+
+
 def test_default_video_codec_applied_to_new_rows(app, tmp_path):
     q = TaskQueue()
     q.default_video_codec = "NVIDIA (NVENC)"

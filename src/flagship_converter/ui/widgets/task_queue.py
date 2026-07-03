@@ -8,6 +8,7 @@ from PySide6.QtWidgets import (
     QFrame, QLabel, QPushButton, QScrollArea, QVBoxLayout, QWidget,
 )
 
+from flagship_converter.core.models import JobStatus
 from flagship_converter.ui import theme
 from flagship_converter.ui.presets import Preset
 from flagship_converter.ui.widgets.file_row import FileRow
@@ -85,6 +86,9 @@ class TaskQueue(QWidget):
             row = FileRow(p, default_video_codec=self.default_video_codec)
             row.set_presets(self._presets)
             row.remove_requested.connect(self._on_remove)
+            row.format_changed.connect(
+                lambda _c: self.files_changed.emit(len(self._rows))
+            )
             self._panel_col.addWidget(row)
             self._rows[row.card_id] = row
             existing.add(p)
@@ -139,6 +143,12 @@ class TaskQueue(QWidget):
 
     def convertible_count(self) -> int:
         return sum(1 for r in self._rows.values() if r.is_convertible())
+
+    def pending_count(self) -> int:
+        return sum(
+            1 for r in self._rows.values()
+            if r.is_convertible() and r.status != JobStatus.DONE
+        )
 
     def has_convertible_files(self) -> bool:
         return self.convertible_count() > 0

@@ -18,6 +18,11 @@ from flagship_converter.ui.settings import AppSettings
 from flagship_converter.ui.widgets.drop_overlay import DropOverlay
 
 _THEME_CYCLE = {"system": "light", "light": "dark", "dark": "system"}
+_THEME_TITLES = {
+    "system": "Тема: Системная",
+    "light": "Тема: Светлая",
+    "dark": "Тема: Тёмная",
+}
 
 
 class MainWindow(QMainWindow):
@@ -78,8 +83,8 @@ class MainWindow(QMainWindow):
             bar.addWidget(btn)
         bar.addStretch()
 
-        self._theme_btn = QPushButton("◐")
-        self._theme_btn.setFixedSize(34, 34)
+        self._theme_btn = QPushButton()
+        self._theme_btn.setFixedHeight(34)
         self._theme_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._theme_btn.setToolTip("Переключить тему")
         self._theme_btn.clicked.connect(self._cycle_theme)
@@ -140,6 +145,9 @@ class MainWindow(QMainWindow):
             "border-radius: 6px; font-size: 13px; font-weight: 700;"
         )
         self._brand_title.setStyleSheet(theme.text_style(p.text_primary, 13, 600))
+        self._theme_btn.setText(
+            _THEME_TITLES.get(self._settings.theme_mode, "Тема")
+        )
         self._theme_btn.setStyleSheet(theme.secondary_button_qss(p))
         self._style_nav()
         self._converter.apply_theme(p)

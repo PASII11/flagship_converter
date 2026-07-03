@@ -54,6 +54,13 @@ def test_apply_preset_sets_format_and_params(app, tmp_path):
     assert row.job_params["quality"] == 70
 
 
+def test_format_change_resets_done_status(app, tmp_path):
+    row = FileRow(_img(tmp_path))
+    row.set_status(JobStatus.DONE)
+    row._format_box.setCurrentText("png")
+    assert row.status == JobStatus.PENDING
+
+
 def test_error_state(app, tmp_path):
     row = FileRow(_img(tmp_path))
     row.set_error("boom")

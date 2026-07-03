@@ -38,7 +38,11 @@ class PresetsPage(QWidget):
         self._store = store
         self._cards: list[QFrame] = []
         self._editing_id: str | None = None
+        self._editor_formats: dict[str, str] = {
+            c: OUTPUT_FORMATS[c][0] for c in _CATEGORIES
+        }
         self._build_ui()
+        self._on_editor_category(0)
         self._rebuild_cards()
         self.apply_theme()
         store.changed.connect(self._rebuild_cards)
@@ -82,37 +86,48 @@ class PresetsPage(QWidget):
         self._name_edit.setPlaceholderText("Название пресета")
         e.addWidget(self._name_edit)
 
-        formats_row = QHBoxLayout()
-        formats_row.setSpacing(theme.SPACING["sm"])
-        self._format_boxes: dict[str, QComboBox] = {}
+        type_row = QHBoxLayout()
+        type_row.setSpacing(theme.SPACING["sm"])
+        self._cat_label = QLabel("Тип файлов")
+        self._cat_box = QComboBox()
         for category in _CATEGORIES:
-            label = QLabel(_CATEGORY_LABELS[category])
-            box = QComboBox()
-            box.addItems(OUTPUT_FORMATS[category])
-            formats_row.addWidget(label)
-            formats_row.addWidget(box)
-            self._format_boxes[category] = box
-        formats_row.addStretch()
-        e.addLayout(formats_row)
+            self._cat_box.addItem(_CATEGORY_LABELS[category], category)
+        self._cat_box.currentIndexChanged.connect(self._on_editor_category)
+        self._fmt_label = QLabel("Формат")
+        self._fmt_box = QComboBox()
+        self._fmt_box.currentTextChanged.connect(self._on_editor_format)
+        type_row.addWidget(self._cat_label)
+        type_row.addWidget(self._cat_box)
+        type_row.addWidget(self._fmt_label)
+        type_row.addWidget(self._fmt_box)
+        type_row.addStretch()
+        e.addLayout(type_row)
 
         params_row = QHBoxLayout()
         params_row.setSpacing(theme.SPACING["sm"])
+        self._quality_label = QLabel("Качество")
         self._quality = QSpinBox()
         self._quality.setRange(1, 95)
         self._quality.setValue(85)
+        self._abitrate_label = QLabel("Битрейт аудио")
         self._abitrate = QComboBox()
         self._abitrate.addItems(["128k", "192k", "256k", "320k"])
+        self._abitrate.setCurrentText("192k")
+        self._vbitrate_label = QLabel("Битрейт видео")
         self._vbitrate = QComboBox()
         self._vbitrate.addItems(["1M", "2.5M", "5M", "10M", "20M"])
+        self._vbitrate.setCurrentText("2.5M")
+        self._codec_label = QLabel("Кодек")
         self._codec = QComboBox()
         self._codec.addItems(
             ["Авто (CPU x264)", "AMD (AMF)", "NVIDIA (NVENC)", "Intel (QSV)"]
         )
-        for label_text, w in (
-            ("Качество", self._quality), ("Аудио", self._abitrate),
-            ("Видео", self._vbitrate), ("Кодек", self._codec),
+        for w in (
+            self._quality_label, self._quality,
+            self._abitrate_label, self._abitrate,
+            self._vbitrate_label, self._vbitrate,
+            self._codec_label, self._codec,
         ):
-            params_row.addWidget(QLabel(label_text))
             params_row.addWidget(w)
         params_row.addStretch()
         e.addLayout(params_row)
@@ -183,9 +198,42 @@ class PresetsPage(QWidget):
         self.apply_requested.emit(preset_id)
 
 
+    def _on_editor_category(self, _index: int) -> None:
+        category = str(self._cat_box.currentData() or "image")
+        self._fmt_box.blockSignals(True)
+        self._fmt_box.clear()
+        self._fmt_box.addItems(OUTPUT_FORMATS[category])
+        self._fmt_box.setCurrentText(
+            self._editor_formats.get(category, OUTPUT_FORMATS[category][0])
+        )
+        self._fmt_box.blockSignals(False)
+        for w in (self._quality_label, self._quality):
+            w.setVisible(category == "image")
+        for w in (self._abitrate_label, self._abitrate):
+            w.setVisible(category == "audio")
+        for w in (
+            self._vbitrate_label, self._vbitrate,
+            self._codec_label, self._codec,
+        ):
+            w.setVisible(category == "video")
+
+    def _on_editor_format(self, fmt: str) -> None:
+        category = str(self._cat_box.currentData() or "")
+        if category and fmt:
+            self._editor_formats[category] = fmt
+
     def _start_new(self) -> None:
         self._editing_id = None
         self._name_edit.setText("")
+        self._editor_formats = {
+            c: OUTPUT_FORMATS[c][0] for c in _CATEGORIES
+        }
+        self._quality.setValue(85)
+        self._abitrate.setCurrentText("192k")
+        self._vbitrate.setCurrentText("2.5M")
+        self._codec.setCurrentText("Авто (CPU x264)")
+        self._cat_box.setCurrentIndex(0)
+        self._on_editor_category(0)
         self._editor.setVisible(True)
 
     def _start_edit(self, preset_id: str) -> None:
@@ -194,12 +242,16 @@ class PresetsPage(QWidget):
             return
         self._editing_id = preset_id
         self._name_edit.setText(preset.name)
-        for category, box in self._format_boxes.items():
-            box.setCurrentText(preset.formats.get(category, ""))
+        self._editor_formats = {
+            c: preset.formats.get(c, OUTPUT_FORMATS[c][0])
+            for c in _CATEGORIES
+        }
         self._quality.setValue(preset.image_quality)
         self._abitrate.setCurrentText(preset.audio_bitrate)
         self._vbitrate.setCurrentText(preset.video_bitrate)
         self._codec.setCurrentText(preset.video_codec)
+        self._cat_box.setCurrentIndex(0)
+        self._on_editor_category(0)
         self._editor.setVisible(True)
 
     def _save_editor(self) -> None:
@@ -208,9 +260,7 @@ class PresetsPage(QWidget):
             id=self._editing_id or str(uuid.uuid4()),
             name=name,
             builtin=False,
-            formats={
-                c: box.currentText() for c, box in self._format_boxes.items()
-            },
+            formats=dict(self._editor_formats),
             image_quality=self._quality.value(),
             audio_bitrate=self._abitrate.currentText(),
             video_bitrate=self._vbitrate.currentText(),
@@ -246,10 +296,16 @@ class PresetsPage(QWidget):
         self._scroll.setStyleSheet(theme.scroll_area_qss(p))
         self._editor.setStyleSheet(theme.panel_qss("PresetEditor", p))
         self._name_edit.setStyleSheet(theme.input_qss(p))
-        for box in self._format_boxes.values():
-            box.setStyleSheet(theme.input_qss(p))
-        for w in (self._quality, self._abitrate, self._vbitrate, self._codec):
+        for w in (
+            self._cat_box, self._fmt_box,
+            self._quality, self._abitrate, self._vbitrate, self._codec,
+        ):
             w.setStyleSheet(theme.input_qss(p))
+        for lbl in (
+            self._cat_label, self._fmt_label, self._quality_label,
+            self._abitrate_label, self._vbitrate_label, self._codec_label,
+        ):
+            lbl.setStyleSheet(theme.text_style(p.text_secondary, 12, 400))
         self._save_btn.setStyleSheet(theme.secondary_button_qss(p))
         self._cancel_btn.setStyleSheet(theme.ghost_button_qss(p))
         self._rebuild_cards()

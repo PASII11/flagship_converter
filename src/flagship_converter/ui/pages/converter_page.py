@@ -138,7 +138,7 @@ class ConverterPage(QWidget):
         self._sync_controls()
 
     def _sync_controls(self) -> None:
-        convertible = self._queue.convertible_count()
+        convertible = self._queue.pending_count()
         self._command_bar.set_convert_count(convertible)
         self._command_bar.set_convert_enabled(
             convertible > 0 and not self._converting
@@ -160,7 +160,7 @@ class ConverterPage(QWidget):
         self._progress_by_job.clear()
         reserved: set[Path] = set()
         for row in self._queue.rows():
-            if not row.is_convertible():
+            if not row.is_convertible() or row.status == JobStatus.DONE:
                 continue
             job = self._engine.build_job(
                 file_path=row.file_path,

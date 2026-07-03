@@ -48,7 +48,10 @@ from flagship_converter.core.converters.media import get_binary_path, get_wkhtml
 SUPPORTED_INPUT = {".pdf", ".docx", ".md"}
 SUPPORTED_OUTPUT = {"pdf", "docx", "md"}
 
-_XML_INCOMPATIBLE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+_XML_INCOMPATIBLE = re.compile(
+    "[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f\\x7f"
+    "\\ud800-\\udfff\\ufdd0-\\ufddf\\ufffe\\uffff]"
+)
 
 
 def _sanitize_for_xml(text: str) -> str:

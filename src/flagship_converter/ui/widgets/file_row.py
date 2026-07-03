@@ -269,6 +269,9 @@ class FileRow(QFrame):
         self._sync_param_visibility(fmt)
         if not self._applying:
             self._overridden = True
+            if self._status == JobStatus.DONE:
+                self.set_progress(0)
+                self.set_status(JobStatus.PENDING)
         self.format_changed.emit(self.category)
 
     def _mark_override(self, *_args: object) -> None:
@@ -429,15 +432,19 @@ class FileRow(QFrame):
             lbl.setStyleSheet(theme.text_style(p.text_secondary, 12, 400))
         self._error_label.setStyleSheet(theme.text_style(p.error, 12, 400))
         self._result_label.setStyleSheet(theme.text_style(p.text_secondary, 12, 400))
-        self._expand_btn.setStyleSheet(theme.ghost_button_qss(p))
+        self._expand_btn.setStyleSheet(
+            theme.ghost_button_qss(p)
+            + "QPushButton { padding: 0; min-height: 28px; font-size: 14px; }"
+        )
         self._remove_btn.setStyleSheet(
             "QPushButton {"
-            f"color: {p.error}; background-color: {p.error_soft};"
-            f"border: 1px solid {p.error_soft};"
-            f"border-radius: {theme.RADIUS['control']}px; font-weight: 700;"
+            f"color: #FFFFFF; background-color: {p.error};"
+            "border: none; padding: 0; min-height: 28px;"
+            f"border-radius: {theme.RADIUS['control']}px;"
+            "font-size: 15px; font-weight: 700;"
             "}"
             "QPushButton:hover {"
-            f"border-color: {p.error};"
+            f"background-color: {p.accent_pressed};"
             "}"
         )
         self._reset_btn.setStyleSheet(theme.ghost_button_qss(p))
