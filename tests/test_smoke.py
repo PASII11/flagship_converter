@@ -73,25 +73,6 @@ def test_build_job_rejects_unsupported_target() -> None:
         assert job is None
 
 
-def test_file_card_tracks_status(tmp_path) -> None:
-    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
-    from PySide6.QtWidgets import QApplication
-
-    from flagship_converter.core.models import JobStatus
-    from flagship_converter.ui.widgets.file_card import FileCard
-
-    src = tmp_path / "image.png"
-    src.touch()
-    app = QApplication.instance() or QApplication([])
-    card = FileCard(src)
-
-    card.set_status(JobStatus.DONE)
-
-    assert app is not None
-    assert card.status == JobStatus.DONE
-    card.deleteLater()
-
-
 class FakeConverter:
     supported_outputs = {"out"}
 

@@ -5,8 +5,7 @@ from dataclasses import dataclass
 from enum import StrEnum
 
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QColor
-from PySide6.QtWidgets import QApplication, QGraphicsDropShadowEffect
+from PySide6.QtWidgets import QApplication
 
 
 class ThemeMode(StrEnum):
@@ -50,17 +49,6 @@ class Palette:
     focus: str
     scrollbar: str
     scrollbar_hover: str
-    # legacy (удаляются в Task 13 вместе со старыми виджетами)
-    app_bg_to: str
-    surface_elevated: str
-    surface_glass: str
-    blue: str
-    blue_soft: str
-    green: str
-    green_soft: str
-    orange: str
-    orange_soft: str
-    shadow: str
 
 
 LIGHT = Palette(
@@ -77,12 +65,6 @@ LIGHT = Palette(
     cat_image="#2E7CF6", cat_audio="#D97706", cat_video="#7C5CFC",
     cat_doc="#0D9488",
     focus="#2E7CF6", scrollbar="#CBD2DC", scrollbar_hover="#98A1AE",
-    app_bg_to="#F6F7F9", surface_elevated="#FFFFFF",
-    surface_glass="#FFFFFF",
-    blue="#2E7CF6", blue_soft="#EAF2FE",
-    green="#1DA55A", green_soft="#E7F6EE",
-    orange="#D97706", orange_soft="#FBF1DF",
-    shadow="#1F2937",
 )
 
 DARK = Palette(
@@ -99,12 +81,6 @@ DARK = Palette(
     cat_image="#5B9BFF", cat_audio="#F2A33C", cat_video="#9D86FF",
     cat_doc="#2CC7B2",
     focus="#5B9BFF", scrollbar="#3D4553", scrollbar_hover="#6B7482",
-    app_bg_to="#101216", surface_elevated="#1E232B",
-    surface_glass="#171A20",
-    blue="#5B9BFF", blue_soft="#16233B",
-    green="#34C97B", green_soft="#12291C",
-    orange="#F2A33C", orange_soft="#2E2312",
-    shadow="#000000",
 )
 
 _mode = ThemeMode.SYSTEM
@@ -214,49 +190,6 @@ QFrame#{object_name} {{
 """
 
 
-def sidebar_qss(p: Palette | None = None) -> str:
-    p = p or palette()
-    return f"""
-QFrame#Sidebar {{
-    background-color: {p.surface_glass};
-    border: 1px solid {p.border};
-    border-radius: 20px;
-}}
-"""
-
-
-def nav_item_qss(selected: bool, p: Palette | None = None) -> str:
-    p = p or palette()
-    if selected:
-        return f"""
-QPushButton {{
-    background-color: {p.accent_soft};
-    color: {p.accent};
-    border: 1px solid {p.accent_soft};
-    text-align: left;
-    padding-left: 14px;
-}}
-QPushButton:hover {{
-    background-color: {p.accent_soft};
-    border-color: {p.accent};
-}}
-"""
-    return f"""
-QPushButton {{
-    background-color: transparent;
-    color: {p.text_secondary};
-    border: 1px solid transparent;
-    text-align: left;
-    padding-left: 14px;
-}}
-QPushButton:hover {{
-    background-color: {p.surface_secondary};
-    color: {p.text_primary};
-    border-color: {p.border};
-}}
-"""
-
-
 def primary_button_qss(p: Palette | None = None) -> str:
     p = p or palette()
     return f"""
@@ -287,7 +220,7 @@ def secondary_button_qss(p: Palette | None = None) -> str:
     p = p or palette()
     return f"""
 QPushButton {{
-    background-color: {p.surface_elevated};
+    background-color: {p.surface};
     color: {p.text_primary};
     border: 1px solid {p.border_strong};
 }}
@@ -335,7 +268,7 @@ def input_qss(p: Palette | None = None) -> str:
     p = p or palette()
     return f"""
 QComboBox, QSpinBox {{
-    background-color: {p.surface_elevated};
+    background-color: {p.surface};
     color: {p.text_primary};
     border: 1px solid {p.border_strong};
     border-radius: 8px;
@@ -353,7 +286,7 @@ QComboBox::drop-down {{
 }}
 
 QComboBox QAbstractItemView {{
-    background-color: {p.surface_elevated};
+    background-color: {p.surface};
     color: {p.text_primary};
     border: 1px solid {p.border};
     selection-background-color: {p.accent};
@@ -385,7 +318,7 @@ QCheckBox::indicator {{
     height: 18px;
     border-radius: 5px;
     border: 1px solid {p.border_strong};
-    background-color: {p.surface_elevated};
+    background-color: {p.surface};
 }}
 QCheckBox::indicator:hover {{
     border-color: {p.accent};
@@ -430,25 +363,6 @@ def text_style(color: str, size: int = 13, weight: int = 400) -> str:
     return f"color: {color}; font-size: {size}px; font-weight: {weight};"
 
 
-def status_pill_style(fg: str, bg: str, border: str | None = None) -> str:
-    border_color = border or bg
-    return (
-        "QLabel {"
-        f"color: {fg}; background-color: {bg}; border: 1px solid {border_color};"
-        "border-radius: 12px; padding: 4px 10px; font-size: 12px; font-weight: 700;"
-        "}"
-    )
-
-
-def category_badge_style(fg: str, bg: str, border: str) -> str:
-    return (
-        "QLabel {"
-        f"color: {fg}; background-color: {bg}; border: 1px solid {border};"
-        "border-radius: 11px; font-size: 12px; font-weight: 800;"
-        "}"
-    )
-
-
 def progress_qss(color: str, p: Palette | None = None) -> str:
     p = p or palette()
     return (
@@ -457,17 +371,6 @@ def progress_qss(color: str, p: Palette | None = None) -> str:
         "}"
         f"QProgressBar::chunk {{ background-color: {color}; border-radius: 3px; }}"
     )
-
-
-def make_shadow(p: Palette | None = None, blur: int = 28, y: int = 10) -> QGraphicsDropShadowEffect:
-    p = p or palette()
-    shadow = QGraphicsDropShadowEffect()
-    shadow.setBlurRadius(blur)
-    shadow.setOffset(0, y)
-    color = QColor(p.shadow)
-    color.setAlpha(34 if not p.is_dark else 70)
-    shadow.setColor(color)
-    return shadow
 
 
 def chip_qss(fg: str, bg: str) -> str:
