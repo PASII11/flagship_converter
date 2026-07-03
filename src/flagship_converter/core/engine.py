@@ -156,7 +156,6 @@ class ConversionEngine:
             if on_job_cancelled:
                 on_job_cancelled(job.id)
 
-        # Шаг 1. Группируем задачи по типам конвертеров (для разного уровня параллелизма)
         jobs_by_converter: dict[str, list[ConversionJob]] = defaultdict(list)
         for job in plan.jobs:
             if cancel_cb():
@@ -164,7 +163,6 @@ class ConversionEngine:
                 continue
             jobs_by_converter[job.converter].append(job)
 
-        # Функция, которая будет крутиться в отдельном потоке
         def _process_job(job: ConversionJob, converter: object) -> None:
             if cancel_cb():
                 mark_cancelled(job)
@@ -180,7 +178,7 @@ class ConversionEngine:
                     on_job_progress(job.id, max(0, min(percent, 100)))
 
             try:
-                converter.convert(  # type: ignore[attr-defined]
+                converter.convert(
                     job.input_path,
                     temp_path,
                     job.params,
@@ -210,10 +208,8 @@ class ConversionEngine:
                 job.error = str(e)
                 on_job_failed(job.id, job.error)
 
-        # Получаем количество ядер, чтобы масштабировать обработку изображений
         cpu_cores = os.cpu_count() or 4
 
-        # Шаг 2. Выполняем каждую группу с её собственным лимитом потоков
         for conv_name, jobs in jobs_by_converter.items():
             if cancel_cb():
                 for job in jobs:
@@ -229,23 +225,20 @@ class ConversionEngine:
                     on_job_failed(j.id, j.error)
                 continue
 
-            # Балансировка нагрузки: определяем сколько задач можно запустить одновременно
             if conv_name == "ImageConverter":
-                workers = cpu_cores  # Картинки отлично параллелятся, загружаем все ядра
+                workers = cpu_cores
             elif conv_name == "AudioConverter":
-                workers = min(4, cpu_cores)  # Аудио упирается в скорость диска
+                workers = min(4, cpu_cores)
             elif conv_name == "VideoConverter":
-                workers = 2  # Видео требует много ресурсов, сам FFmpeg внутри многопоточный
+                workers = 2
             else:
-                workers = 1  # DocConverter: строго 1 поток во избежание OOM и багов PyInstaller
+                workers = 1
 
             with concurrent.futures.ThreadPoolExecutor(max_workers=self._effective_workers(workers)) as pool:
                 futures = [pool.submit(_process_job, job, converter) for job in jobs]
 
-                # Ждем завершения этого батча, прежде чем переходить к следующему типу файлов
                 for future in concurrent.futures.as_completed(futures):
                     try:
                         future.result()
                     except Exception:
-                        # Исключения уже перехвачены внутри _process_job, так что просто идем дальше
                         pass

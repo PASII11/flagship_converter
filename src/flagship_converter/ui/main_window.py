@@ -97,7 +97,6 @@ class MainWindow(QMainWindow):
         self._stack.addWidget(self._settings_page)
         col.addWidget(self._stack, stretch=1)
 
-    # -- навигация и тема --
 
     def _go(self, index: int) -> None:
         self._stack.setCurrentIndex(index)
@@ -141,7 +140,7 @@ class MainWindow(QMainWindow):
             "border-radius: 6px; font-size: 13px; font-weight: 700;"
         )
         self._brand_title.setStyleSheet(theme.text_style(p.text_primary, 13, 600))
-        self._theme_btn.setStyleSheet(theme.ghost_button_qss(p))
+        self._theme_btn.setStyleSheet(theme.secondary_button_qss(p))
         self._style_nav()
         self._converter.apply_theme(p)
         self._presets_page.apply_theme(p)
@@ -153,9 +152,8 @@ class MainWindow(QMainWindow):
         for index, btn in enumerate(self._nav_buttons):
             btn.setStyleSheet(theme.nav_button_qss(index == current, p))
 
-    # -- drag & drop на всё окно --
 
-    def dragEnterEvent(self, event: QDragEnterEvent) -> None:  # type: ignore[override]
+    def dragEnterEvent(self, event: QDragEnterEvent) -> None:
         if event.mimeData().hasUrls():
             text = (
                 "Дождитесь завершения текущей конвертации"
@@ -167,10 +165,10 @@ class MainWindow(QMainWindow):
         else:
             event.ignore()
 
-    def dragLeaveEvent(self, event: object) -> None:  # type: ignore[override]
+    def dragLeaveEvent(self, event: object) -> None:
         self._overlay.hide_overlay()
 
-    def dropEvent(self, event: QDropEvent) -> None:  # type: ignore[override]
+    def dropEvent(self, event: QDropEvent) -> None:
         self._overlay.hide_overlay()
         if self._converter.is_converting:
             event.ignore()
@@ -185,7 +183,7 @@ class MainWindow(QMainWindow):
             self._go(0)
         event.acceptProposedAction()
 
-    def resizeEvent(self, event: object) -> None:  # type: ignore[override]
-        super().resizeEvent(event)  # type: ignore[arg-type]
+    def resizeEvent(self, event: object) -> None:
+        super().resizeEvent(event)
         if self._overlay.isVisible():
             self._overlay.setGeometry(self.rect())

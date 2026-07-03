@@ -4,7 +4,7 @@ from pathlib import Path
 import pytest
 from PySide6.QtWidgets import QApplication
 
-from flagship_converter.ui.presets import BUILTIN_PRESETS
+from flagship_converter.ui.presets import Preset
 from flagship_converter.ui.widgets.task_queue import TaskQueue
 
 
@@ -49,7 +49,11 @@ def test_apply_preset_skips_overridden(app, tmp_path):
     q.add_files(_files(tmp_path))
     rows = q.rows()
     rows[0]._format_box.setCurrentText("png")
-    q.apply_preset(BUILTIN_PRESETS[0])  # «Для веба»: image→webp, audio→mp3
+    web = Preset(
+        id="web", name="Веб", builtin=False,
+        formats={"image": "webp", "audio": "mp3"},
+    )
+    q.apply_preset(web)
     assert rows[0].target_ext == "png"
     assert rows[1].target_ext == "webp"
     audio = [r for r in rows if r.category == "audio"][0]

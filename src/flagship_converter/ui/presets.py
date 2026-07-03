@@ -23,23 +23,7 @@ class Preset:
     video_codec: str = DEFAULT_CODEC
 
 
-BUILTIN_PRESETS: list[Preset] = [
-    Preset(
-        id="builtin-web", name="Для веба", builtin=True,
-        formats={"image": "webp", "audio": "mp3", "video": "mp4", "doc": "pdf"},
-        image_quality=80, audio_bitrate="192k", video_bitrate="2.5M",
-    ),
-    Preset(
-        id="builtin-max", name="Максимум качества", builtin=True,
-        formats={"image": "png", "audio": "flac", "video": "mkv", "doc": "pdf"},
-        image_quality=95, audio_bitrate="320k", video_bitrate="10M",
-    ),
-    Preset(
-        id="builtin-mail", name="Сжать для почты", builtin=True,
-        formats={"image": "jpg", "audio": "mp3", "video": "mp4", "doc": "pdf"},
-        image_quality=70, audio_bitrate="128k", video_bitrate="1M",
-    ),
-]
+BUILTIN_PRESETS: list[Preset] = []
 
 
 def _default_path() -> Path:

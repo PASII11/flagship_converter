@@ -1,5 +1,4 @@
 """Конвертер документов (PDF, DOCX, MD) на базе Docling и pdfkit."""
-# ruff: noqa: E402,I001
 from __future__ import annotations
 
 import base64
@@ -7,6 +6,7 @@ import gc
 import html
 import mimetypes
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -23,16 +23,13 @@ from docx.oxml.ns import qn
 from docx.table import Table
 from docx.text.paragraph import Paragraph
 
-# Жизненно важные настройки для HuggingFace на Windows без админа
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 os.environ["HUGGINGFACE_HUB_VERBOSITY"] = "error"
 os.environ.setdefault("HF_HUB_OFFLINE", "1")
 os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
-# ЖЕСТКО отключаем скрытый мультипроцессинг, который ломает PyInstaller
 os.environ["LOKY_MAX_CPU_COUNT"] = "1"
 os.environ["OMP_NUM_THREADS"] = "1"
 
-# Патчим симлинки до любых других импортов
 import huggingface_hub.file_download as _hf_fd
 
 def _safe_symlink(src: str, dst: str, **kwargs: object) -> None:
@@ -43,13 +40,19 @@ def _safe_symlink(src: str, dst: str, **kwargs: object) -> None:
         if not os.path.exists(dst):
             shutil.copy2(src_abs, dst)
 
-_hf_fd._create_symlink = _safe_symlink  # type: ignore[attr-defined]
+_hf_fd._create_symlink = _safe_symlink
 
 from flagship_converter.core.converters.base import safe_output_path
 from flagship_converter.core.converters.media import get_binary_path, get_wkhtmltopdf_path
 
 SUPPORTED_INPUT = {".pdf", ".docx", ".md"}
 SUPPORTED_OUTPUT = {"pdf", "docx", "md"}
+
+_XML_INCOMPATIBLE = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]")
+
+
+def _sanitize_for_xml(text: str) -> str:
+    return _XML_INCOMPATIBLE.sub("", text)
 
 
 def _resource_path(name: str) -> Path:
@@ -358,8 +361,6 @@ class DocConverter:
     supported_outputs = SUPPORTED_OUTPUT
 
     def __init__(self) -> None:
-        # Мы БОЛЬШЕ НЕ храним DocumentConverter как атрибут класса!
-        # Иначе pypdfium2 крашится при закрытии скомпилированного .exe
         pass
 
     def can_handle(self, path: Path) -> bool:
@@ -398,7 +399,6 @@ class DocConverter:
                 progress_cb(100)
             return
 
-        # 1. Читаем исходник (локальная инициализация для защиты памяти)
         if input_path.suffix.lower() == ".md":
             md_text = input_path.read_text(encoding="utf-8")
         else:
@@ -420,14 +420,12 @@ class DocConverter:
                 from docling.datamodel.pipeline_options import PdfPipelineOptions
                 from docling.document_converter import DocumentConverter, PdfFormatOption
 
-                # Ограничиваем потоки
                 accelerator_options = AcceleratorOptions(num_threads=1)
                 pipeline_options = PdfPipelineOptions()
                 pipeline_options.accelerator_options = accelerator_options
                 pipeline_options.artifacts_path = artifacts_path
                 pipeline_options.enable_remote_services = False
 
-                # Создаем конвертер ЛОКАЛЬНО
                 converter = None
                 conv_res = None
                 try:
@@ -442,7 +440,6 @@ class DocConverter:
                         raise RuntimeError(f"Docling returned no document for {input_path.name}")
                     md_text = conv_res.document.export_to_markdown()
                 finally:
-                    # Ensure native resources are released even when Docling raises.
                     del conv_res
                     del converter
                     gc.collect()
@@ -453,7 +450,6 @@ class DocConverter:
         if progress_cb:
             progress_cb(60)
 
-        # 2. Пишем в целевой формат
         output_path.parent.mkdir(parents=True, exist_ok=True)
         if target_ext == "md":
             output_path.write_text(md_text, encoding="utf-8")
@@ -476,7 +472,7 @@ img {{ max-width: 100%; }}
 
         elif target_ext == "docx":
             doc = Document()
-            for line in md_text.split("\n"):
+            for line in _sanitize_for_xml(md_text).split("\n"):
                 if line.startswith("# "):
                     doc.add_heading(line[2:], level=1)
                 elif line.startswith("## "):

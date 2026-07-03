@@ -83,6 +83,7 @@ class FileRow(QFrame):
         self._overridden = False
         self._expanded = False
         self._applying = False
+        self._presets: list[Preset] = []
         self._build_ui()
         if default_video_codec:
             self._applying = True
@@ -92,7 +93,6 @@ class FileRow(QFrame):
                 self._applying = False
         self.apply_theme()
 
-    # -- построение --
 
     def _build_ui(self) -> None:
         self.setObjectName("FileRow")
@@ -168,6 +168,18 @@ class FileRow(QFrame):
         )
         d.setSpacing(theme.SPACING["sm"])
 
+        preset_row = QHBoxLayout()
+        preset_row.setSpacing(theme.SPACING["sm"])
+        self._preset_label = QLabel("Пресет")
+        self._preset_box = QComboBox()
+        self._preset_box.setMinimumWidth(160)
+        self._preset_box.addItem("Свои настройки", "")
+        self._preset_box.currentIndexChanged.connect(self._on_preset_chosen)
+        preset_row.addWidget(self._preset_label)
+        preset_row.addWidget(self._preset_box)
+        preset_row.addStretch()
+        d.addLayout(preset_row)
+
         params = QHBoxLayout()
         params.setSpacing(theme.SPACING["sm"])
         self._quality_label = QLabel("Качество")
@@ -236,7 +248,6 @@ class FileRow(QFrame):
         self._anim.setEasingCurve(QEasingCurve.Type.OutCubic)
         self._sync_param_visibility(self._format_box.currentText())
 
-    # -- поведение --
 
     def _sync_param_visibility(self, fmt: str) -> None:
         is_img = self.category == "image"
@@ -286,8 +297,29 @@ class FileRow(QFrame):
         finally:
             self._applying = False
 
+    def set_presets(self, presets: list[Preset]) -> None:
+        self._presets = list(presets)
+        current = str(self._preset_box.currentData() or "")
+        self._preset_box.blockSignals(True)
+        self._preset_box.clear()
+        self._preset_box.addItem("Свои настройки", "")
+        for preset in presets:
+            self._preset_box.addItem(preset.name, preset.id)
+        self._preset_box.setCurrentIndex(
+            max(0, self._preset_box.findData(current))
+        )
+        self._preset_box.blockSignals(False)
+
+    def _on_preset_chosen(self, _index: int) -> None:
+        preset_id = str(self._preset_box.currentData() or "")
+        preset = next((p for p in self._presets if p.id == preset_id), None)
+        if preset:
+            self._overridden = False
+            self.apply_preset(preset)
+
     def reset_override(self) -> None:
         self._overridden = False
+        self._on_preset_chosen(self._preset_box.currentIndex())
 
     @property
     def is_overridden(self) -> bool:
@@ -362,11 +394,11 @@ class FileRow(QFrame):
         for w in (
             self._format_box, self._quality, self._abitrate,
             self._vbitrate, self._codec, self._reset_btn,
+            self._preset_box,
         ):
             w.setEnabled(enabled)
         self._remove_btn.setEnabled(not locked)
 
-    # -- вид --
 
     def apply_theme(self, p: theme.Palette | None = None) -> None:
         p = p or theme.palette()
@@ -386,6 +418,8 @@ class FileRow(QFrame):
         self._name.setStyleSheet(theme.text_style(p.text_primary, 13, 600))
         self._meta.setStyleSheet(theme.text_style(p.text_muted, 12, 400))
         self._format_box.setStyleSheet(theme.input_qss(p))
+        self._preset_box.setStyleSheet(theme.input_qss(p))
+        self._preset_label.setStyleSheet(theme.text_style(p.text_secondary, 12, 400))
         for w in (self._quality, self._abitrate, self._vbitrate, self._codec):
             w.setStyleSheet(theme.input_qss(p))
         for lbl in (
@@ -396,7 +430,16 @@ class FileRow(QFrame):
         self._error_label.setStyleSheet(theme.text_style(p.error, 12, 400))
         self._result_label.setStyleSheet(theme.text_style(p.text_secondary, 12, 400))
         self._expand_btn.setStyleSheet(theme.ghost_button_qss(p))
-        self._remove_btn.setStyleSheet(theme.ghost_button_qss(p, danger=True))
+        self._remove_btn.setStyleSheet(
+            "QPushButton {"
+            f"color: {p.error}; background-color: {p.error_soft};"
+            f"border: 1px solid {p.error_soft};"
+            f"border-radius: {theme.RADIUS['control']}px; font-weight: 700;"
+            "}"
+            "QPushButton:hover {"
+            f"border-color: {p.error};"
+            "}"
+        )
         self._reset_btn.setStyleSheet(theme.ghost_button_qss(p))
         self._copy_btn.setStyleSheet(theme.secondary_button_qss(p))
         self._open_btn.setStyleSheet(theme.secondary_button_qss(p))
@@ -417,7 +460,6 @@ class FileRow(QFrame):
         self._status_mark.setStyleSheet(theme.text_style(fg, 13, 700))
         self._progress.setStyleSheet(theme.progress_qss(bar, p))
 
-    # -- действия --
 
     def _copy_error(self) -> None:
         from PySide6.QtWidgets import QApplication

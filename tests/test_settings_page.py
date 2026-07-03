@@ -26,7 +26,7 @@ def test_widgets_reflect_settings(app, settings):
     settings.overwrite = True
     page = SettingsPage(settings)
     assert page._theme_box.currentData() == "dark"
-    assert page._workers_spin.value() == 4
+    assert page._workers_box.currentData() == 4
     assert page._conflict_box.currentData() is True
 
 
@@ -34,7 +34,7 @@ def test_changing_widgets_updates_settings(app, settings):
     page = SettingsPage(settings)
     page._theme_box.setCurrentIndex(page._theme_box.findData("light"))
     assert settings.theme_mode == "light"
-    page._workers_spin.setValue(2)
+    page._workers_box.setCurrentIndex(page._workers_box.findData(2))
     assert settings.max_workers == 2
     page._output_mode_box.setCurrentIndex(
         page._output_mode_box.findData("fixed")

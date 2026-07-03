@@ -340,6 +340,9 @@ QScrollArea {{
     border: none;
     background: transparent;
 }}
+QScrollArea > QWidget#qt_scrollarea_viewport {{
+    background: transparent;
+}}
 QScrollBar:vertical {{
     width: 10px;
     background: transparent;

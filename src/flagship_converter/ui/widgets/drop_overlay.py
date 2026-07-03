@@ -46,7 +46,7 @@ class DropOverlay(QWidget):
     def hide_overlay(self) -> None:
         self.hide()
 
-    def paintEvent(self, event: object) -> None:  # type: ignore[override]
+    def paintEvent(self, event: object) -> None:
         painter = QPainter(self)
         p = theme.palette()
         veil = QColor(p.app_bg)

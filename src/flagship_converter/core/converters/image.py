@@ -89,7 +89,6 @@ class ImageConverter:
                 pil_format = fmt_map.get(target_ext, target_ext.upper())
                 img.save(str(output_path), format=pil_format, **save_kwargs)
 
-                # Фото конвертируется мгновенно, кидаем 100%
                 if progress_cb:
                     progress_cb(100)
 

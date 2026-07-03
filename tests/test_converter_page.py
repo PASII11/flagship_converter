@@ -1,4 +1,4 @@
-"""ConverterPage: связка очереди, bulk-чипов, пресетов и футера."""
+"""ConverterPage: связка очереди, пресетов и футера."""
 from pathlib import Path
 
 import pytest
@@ -7,7 +7,7 @@ from PySide6.QtWidgets import QApplication
 
 from flagship_converter.core.engine import ConversionEngine
 from flagship_converter.ui.pages.converter_page import ConverterPage
-from flagship_converter.ui.presets import PresetStore
+from flagship_converter.ui.presets import Preset, PresetStore
 from flagship_converter.ui.settings import AppSettings
 
 
@@ -37,20 +37,25 @@ def _files(tmp_path: Path) -> list[str]:
     return out
 
 
-def test_add_files_updates_counter_and_chips(page, tmp_path):
+def test_add_files_updates_counter(page, tmp_path):
     page.add_files(_files(tmp_path))
     assert page._queue.count() == 2
     assert page._command_bar._convert_btn.text() == "Конвертировать 2"
-    assert set(page._bulk_chips.keys()) == {"image", "audio"}
 
 
-def test_preset_applies_to_new_files(page, tmp_path):
-    page.apply_preset_by_id("builtin-mail")  # image -> jpg
+def test_apply_preset_by_id_applies_to_rows(page, tmp_path):
+    page._store.add(Preset(
+        id="p1", name="Почта", builtin=False,
+        formats={"image": "jpg"}, image_quality=70,
+    ))
     f = tmp_path / "c.png"
     f.write_bytes(b"x")
     page.add_files([str(f)])
     row = page._queue.rows()[-1]
+    assert row._preset_box.count() == 2
+    page.apply_preset_by_id("p1")
     assert row.target_ext == "jpg"
+    assert row.job_params["quality"] == 70
 
 
 def test_footer_aggregates_after_callbacks(page, tmp_path):

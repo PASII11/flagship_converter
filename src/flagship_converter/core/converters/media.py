@@ -12,7 +12,6 @@ from pathlib import Path
 
 from flagship_converter.core.converters.base import ConversionCancelled
 
-# Регулярки для парсинга вывода FFmpeg
 DURATION_RE = re.compile(r"Duration:\s*(?P<hours>\d+):(?P<minutes>\d+):(?P<seconds>\d+\.\d+)")
 TIME_RE = re.compile(r"time=(?P<hours>\d+):(?P<minutes>\d+):(?P<seconds>\d+\.\d+)")
 
@@ -25,13 +24,11 @@ def get_binary_path(name: str, win_default_paths: list[str] | None = None) -> st
     """Ищет бинарник в бандле PyInstaller, затем в PATH, затем по дефолтным путям Windows."""
     exe_name = f"{name}.exe" if sys.platform == "win32" else name
 
-    # 1. Ищем в бандле (когда скомпилировано через PyInstaller)
     if getattr(sys, "frozen", False) and hasattr(sys, "_MEIPASS"):
         bundle_path = Path(sys._MEIPASS) / exe_name
         if bundle_path.exists():
             return str(bundle_path)
 
-    # 2. Ищем в локальной папке сборочных бинарников при запуске из исходников.
     local_tool = Path.cwd() / "build_tools" / exe_name
     if local_tool.exists():
         return str(local_tool)
@@ -43,14 +40,12 @@ def get_binary_path(name: str, win_default_paths: list[str] | None = None) -> st
     except IndexError:
         pass
 
-    # 3. Ищем по дефолтным путям (только Windows)
     if sys.platform == "win32" and win_default_paths:
         for p in win_default_paths:
             full_path = Path(p) / exe_name
             if full_path.exists():
                 return str(full_path)
 
-    # 4. Ищем в PATH и явно сообщаем, если бинарника нет.
     found = shutil.which(exe_name) or shutil.which(name)
     if found:
         return found
@@ -76,11 +71,10 @@ def get_wkhtmltopdf_path() -> str:
 
 def _enqueue_output(out_stream: object, q: queue.Queue[str]) -> None:
     """Фоновый поток для непрерывного чтения вывода процесса без блокировки."""
-    # Используем iter для чтения до EOF (пустой строки)
-    for line in iter(out_stream.readline, ""):  # type: ignore[attr-defined]
+    for line in iter(out_stream.readline, ""):
         if line:
             q.put(line)
-    out_stream.close()  # type: ignore[attr-defined]
+    out_stream.close()
 
 
 def _terminate_process(process: subprocess.Popen[str]) -> None:
@@ -113,14 +107,13 @@ def run_ffmpeg(
         creationflags=creationflags,
         encoding="utf-8",
         errors="replace",
-        bufsize=1,  # Построчная буферизация
+        bufsize=1,
     )
 
     if not process.stderr:
         _terminate_process(process)
         raise RuntimeError("Не удалось открыть stderr процесса FFmpeg")
 
-    # Создаем очередь и запускаем поток-читатель
     q: queue.Queue[str] = queue.Queue()
     t = threading.Thread(target=_enqueue_output, args=(process.stderr, q), daemon=True)
     t.start()
@@ -129,17 +122,14 @@ def run_ffmpeg(
     total_seconds = 0.0
 
     while True:
-        # 1. Проверяем флаг отмены из UI
         if cancel_cb():
             _terminate_process(process)
             t.join(timeout=1.0)
             raise ConversionCancelled()
 
-        # 2. Неблокирующее чтение из очереди
         try:
             line = q.get(timeout=0.1)
         except queue.Empty:
-            # Очередь пуста. Если процесс завершен — выходим из цикла
             if process.poll() is not None:
                 break
             continue
@@ -152,7 +142,6 @@ def run_ffmpeg(
         if len(error_log) > 20:
             error_log.pop(0)
 
-        # 3. Парсинг прогресса
         if progress_cb:
             if total_seconds == 0.0:
                 dur_match = DURATION_RE.search(line)
@@ -174,7 +163,7 @@ def run_ffmpeg(
                     progress_cb(percent)
 
     process.wait()
-    t.join(timeout=1.0)  # Даем потоку секунду на корректное завершение
+    t.join(timeout=1.0)
 
     if process.returncode != 0 and not cancel_cb():
         err_str = "\n".join(error_log)

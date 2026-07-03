@@ -21,6 +21,7 @@ class TaskQueue(QWidget):
         super().__init__(parent)
         self._rows: dict[str, FileRow] = {}
         self.default_video_codec: str | None = None
+        self._presets: list[Preset] = []
 
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
@@ -29,6 +30,7 @@ class TaskQueue(QWidget):
         )
 
         container = QWidget()
+        container.setStyleSheet("background: transparent;")
         outer_col = QVBoxLayout(container)
         outer_col.setContentsMargins(0, 0, 6, 0)
         outer_col.setSpacing(theme.SPACING["md"])
@@ -72,7 +74,6 @@ class TaskQueue(QWidget):
         col.addWidget(self._empty_btn, alignment=Qt.AlignmentFlag.AlignCenter)
         return frame
 
-    # -- данные --
 
     def add_files(self, paths: list[str | Path]) -> int:
         existing = {r.file_path.resolve() for r in self._rows.values()}
@@ -82,6 +83,7 @@ class TaskQueue(QWidget):
             if p in existing or not p.is_file():
                 continue
             row = FileRow(p, default_video_codec=self.default_video_codec)
+            row.set_presets(self._presets)
             row.remove_requested.connect(self._on_remove)
             self._panel_col.addWidget(row)
             self._rows[row.card_id] = row
@@ -115,6 +117,11 @@ class TaskQueue(QWidget):
             changed += 1
         return changed
 
+    def set_presets(self, presets: list[Preset]) -> None:
+        self._presets = list(presets)
+        for row in self._rows.values():
+            row.set_presets(self._presets)
+
     def apply_preset(self, preset: Preset) -> None:
         for row in self._rows.values():
             if not row.is_overridden:
@@ -136,7 +143,6 @@ class TaskQueue(QWidget):
     def has_convertible_files(self) -> bool:
         return self.convertible_count() > 0
 
-    # -- вид --
 
     def apply_theme(self, p: theme.Palette | None = None) -> None:
         p = p or theme.palette()

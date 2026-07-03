@@ -1,4 +1,4 @@
-"""Страница-верстак: командная строка, bulk-операции, очередь, футер."""
+"""Страница-верстак: командная строка, очередь, футер."""
 from __future__ import annotations
 
 import threading
@@ -7,7 +7,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt, QThreadPool, QUrl
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
-    QComboBox, QFileDialog, QHBoxLayout, QLabel, QProgressBar,
+    QFileDialog, QHBoxLayout, QLabel, QProgressBar,
     QPushButton, QVBoxLayout, QWidget,
 )
 
@@ -17,14 +17,8 @@ from flagship_converter.ui import theme
 from flagship_converter.ui.presets import PresetStore
 from flagship_converter.ui.settings import AppSettings
 from flagship_converter.ui.widgets.command_bar import CommandBar
-from flagship_converter.ui.widgets.file_row import OUTPUT_FORMATS
 from flagship_converter.ui.widgets.task_queue import TaskQueue
 from flagship_converter.ui.workers import PlanRunner
-
-CATEGORY_LABELS = {
-    "image": "Изображения", "audio": "Аудио",
-    "video": "Видео", "doc": "Документы",
-}
 
 
 class ConverterPage(QWidget):
@@ -43,10 +37,9 @@ class ConverterPage(QWidget):
         self._active_runner: PlanRunner | None = None
         self._job_row_map: dict[str, str] = {}
         self._progress_by_job: dict[str, int] = {}
-        self._current_preset_id = ""
-        self._bulk_chips: dict[str, QComboBox] = {}
         self._build_ui()
         self._queue.default_video_codec = settings.default_video_codec
+        self._queue.set_presets(store.presets())
         settings.changed.connect(self._on_settings_changed)
         self.apply_theme()
         self._sync_controls()
@@ -66,22 +59,10 @@ class ConverterPage(QWidget):
 
         self._command_bar = CommandBar()
         self._command_bar.add_files_clicked.connect(self._pick_files)
-        self._command_bar.preset_selected.connect(self.apply_preset_by_id)
         self._command_bar.folder_clicked.connect(self._pick_folder)
         self._command_bar.convert_clicked.connect(self._start_conversion)
         self._command_bar.cancel_clicked.connect(self._cancel_conversion)
-        self._command_bar.set_presets(self._store.presets())
         col.addWidget(self._command_bar)
-
-        self._bulk_row = QWidget()
-        self._bulk_layout = QHBoxLayout(self._bulk_row)
-        self._bulk_layout.setContentsMargins(theme.SPACING["xs"], 0, 0, 0)
-        self._bulk_layout.setSpacing(theme.SPACING["sm"])
-        self._bulk_caption = QLabel("Формат для всех:")
-        self._bulk_layout.addWidget(self._bulk_caption)
-        self._bulk_layout.addStretch()
-        self._bulk_row.setVisible(False)
-        col.addWidget(self._bulk_row)
 
         self._queue = TaskQueue()
         self._queue.files_changed.connect(self._on_files_changed)
@@ -109,25 +90,17 @@ class ConverterPage(QWidget):
         col.addWidget(footer)
 
         self._store.changed.connect(
-            lambda: self._command_bar.set_presets(
-                self._store.presets(), self._current_preset_id
-            )
+            lambda: self._queue.set_presets(self._store.presets())
         )
         self._sync_folder_text()
 
-    # -- файлы и пресеты --
 
     def add_files(self, paths: list[str]) -> None:
         if self._converting:
             return
-        added = self._queue.add_files(paths)
-        if added and self._current_preset_id:
-            preset = self._store.get(self._current_preset_id)
-            if preset:
-                self._queue.apply_preset(preset)
+        self._queue.add_files(paths)
 
     def apply_preset_by_id(self, preset_id: str) -> None:
-        self._current_preset_id = preset_id
         preset = self._store.get(preset_id) if preset_id else None
         if preset:
             self._queue.apply_preset(preset)
@@ -161,30 +134,7 @@ class ConverterPage(QWidget):
             return Path(self._settings.fixed_output_dir)
         return row_path.parent / "converted"
 
-    # -- bulk-чипы --
-
-    def _rebuild_bulk_chips(self) -> None:
-        for chip in self._bulk_chips.values():
-            chip.setParent(None)
-            chip.deleteLater()
-        self._bulk_chips.clear()
-        categories = sorted(self._queue.categories_present())
-        for category in categories:
-            chip = QComboBox()
-            chip.addItems(OUTPUT_FORMATS[category])
-            chip.setToolTip(CATEGORY_LABELS.get(category, category))
-            chip.currentTextChanged.connect(
-                lambda ext, c=category: self._queue.bulk_set_format(c, ext)
-            )
-            chip.setStyleSheet(theme.input_qss())
-            self._bulk_layout.insertWidget(
-                self._bulk_layout.count() - 1, chip
-            )
-            self._bulk_chips[category] = chip
-        self._bulk_row.setVisible(bool(categories))
-
     def _on_files_changed(self, _count: int) -> None:
-        self._rebuild_bulk_chips()
         self._sync_controls()
 
     def _sync_controls(self) -> None:
@@ -201,7 +151,6 @@ class ConverterPage(QWidget):
             self._percent_label.setText("")
             self._open_folder_btn.setVisible(False)
 
-    # -- конвертация (порт из старого MainWindow) --
 
     def _start_conversion(self) -> None:
         if self._converting:
@@ -255,8 +204,6 @@ class ConverterPage(QWidget):
         self._converting = converting
         self._command_bar.set_converting(converting)
         self._queue.lock_all(converting)
-        for chip in self._bulk_chips.values():
-            chip.setEnabled(not converting)
         if not converting:
             self._sync_controls()
 
@@ -354,15 +301,11 @@ class ConverterPage(QWidget):
                 )
                 return
 
-    # -- вид --
 
     def apply_theme(self, p: theme.Palette | None = None) -> None:
         p = p or theme.palette()
         self._command_bar.apply_theme(p)
         self._queue.apply_theme(p)
-        self._bulk_caption.setStyleSheet(theme.text_style(p.text_muted, 12, 400))
-        for chip in self._bulk_chips.values():
-            chip.setStyleSheet(theme.input_qss(p))
         self._footer_label.setStyleSheet(theme.text_style(p.text_secondary, 12, 400))
         self._percent_label.setStyleSheet(theme.text_style(p.text_secondary, 13, 600))
         self._overall.setStyleSheet(theme.progress_qss(p.running, p))

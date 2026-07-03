@@ -12,7 +12,7 @@ from flagship_converter.core.models import ConversionPlan
 
 class WorkerSignals(QObject):
     job_started = Signal(str)
-    job_progress = Signal(str, int)    # job_id, percent
+    job_progress = Signal(str, int)
     job_finished = Signal(str)
     job_failed = Signal(str, str)
     job_cancelled = Signal(str)

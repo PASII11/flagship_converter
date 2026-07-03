@@ -23,7 +23,7 @@ class ConversionJob:
     output_path: Path
     converter: str
     params: dict[str, object]
-    target_ext: str = ""          # ← NEW: каждый job знает свой формат
+    target_ext: str = ""
     overwrite: bool = False
     id: str = field(default_factory=lambda: str(uuid.uuid4()))
     status: JobStatus = JobStatus.PENDING

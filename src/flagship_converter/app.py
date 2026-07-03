@@ -11,16 +11,10 @@ from flagship_converter.ui.main_window import MainWindow
 
 def main() -> None:
     """Запустить приложение."""
-    # Обязательно для корректной работы multiprocessing в PyInstaller (Windows)
     multiprocessing.freeze_support()
 
     app = QApplication(sys.argv)
 
-    # ---------------------------------------------------------
-    # ЖЕЛЕЗОБЕТОННЫЙ ФИКС СТИЛЕЙ:
-    # Отключаем системный движок отрисовки Windows,
-    # который ломает наши кастомные QSS-стили.
-    # ---------------------------------------------------------
     app.setStyle("Fusion")
 
     app.setApplicationName("Flagship File Converter")

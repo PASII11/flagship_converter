@@ -61,6 +61,7 @@ class PresetsPage(QWidget):
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
         container = QWidget()
+        container.setStyleSheet("background: transparent;")
         self._cards_col = QVBoxLayout(container)
         self._cards_col.setContentsMargins(0, 0, 6, 0)
         self._cards_col.setSpacing(theme.SPACING["md"])
@@ -127,7 +128,6 @@ class PresetsPage(QWidget):
         e.addLayout(buttons)
         col.addWidget(self._editor)
 
-    # -- карточки --
 
     def _rebuild_cards(self) -> None:
         for card in self._cards:
@@ -182,7 +182,6 @@ class PresetsPage(QWidget):
     def _on_apply(self, preset_id: str) -> None:
         self.apply_requested.emit(preset_id)
 
-    # -- редактор --
 
     def _start_new(self) -> None:
         self._editing_id = None
@@ -223,7 +222,6 @@ class PresetsPage(QWidget):
             self._store.add(preset)
         self._editor.setVisible(False)
 
-    # -- вид --
 
     def _card_qss(self) -> str:
         p = theme.palette()

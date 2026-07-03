@@ -5,7 +5,7 @@ import pytest
 from PySide6.QtWidgets import QApplication
 
 from flagship_converter.core.models import JobStatus
-from flagship_converter.ui.presets import BUILTIN_PRESETS
+from flagship_converter.ui.presets import Preset
 from flagship_converter.ui.widgets.file_row import FileRow, get_category
 
 
@@ -45,7 +45,10 @@ def test_set_target_format_does_not_override(app, tmp_path):
 
 def test_apply_preset_sets_format_and_params(app, tmp_path):
     row = FileRow(_img(tmp_path))
-    preset = BUILTIN_PRESETS[2]  # «Сжать для почты»: jpg, quality 70
+    preset = Preset(
+        id="mail", name="Почта", builtin=False,
+        formats={"image": "jpg"}, image_quality=70,
+    )
     row.apply_preset(preset)
     assert row.target_ext == "jpg"
     assert row.job_params["quality"] == 70

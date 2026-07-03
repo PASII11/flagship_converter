@@ -49,7 +49,6 @@ class VideoConverter:
         if target_ext == "webm":
             cmd.extend(["-c:v", "libvpx-vp9", "-b:v", video_bitrate, "-c:a", "libopus"])
         else:
-            # Выбор аппаратного кодека
             if "AMD" in codec_str:
                 vcodec = "h264_amf"
             elif "NVIDIA" in codec_str:

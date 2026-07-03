@@ -4,7 +4,7 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
     QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QPushButton,
-    QSpinBox, QVBoxLayout, QWidget,
+    QVBoxLayout, QWidget,
 )
 
 from flagship_converter.ui import theme
@@ -84,14 +84,18 @@ class SettingsPage(QWidget):
         )
         panel_col.addWidget(self._row("Тема", self._theme_box))
 
-        self._workers_spin = QSpinBox()
-        self._workers_spin.setRange(0, 16)
-        self._workers_spin.setSpecialValueText("Авто")
-        self._workers_spin.valueChanged.connect(
-            lambda v: setattr(self._settings, "max_workers", int(v))
+        self._workers_box = QComboBox()
+        self._workers_box.addItem("Авто", 0)
+        for count in range(1, 17):
+            self._workers_box.addItem(str(count), count)
+        self._workers_box.currentIndexChanged.connect(
+            lambda _i: setattr(
+                self._settings, "max_workers",
+                int(self._workers_box.currentData()),
+            )
         )
         panel_col.addWidget(
-            self._row("Максимум параллельных задач", self._workers_spin)
+            self._row("Максимум параллельных задач", self._workers_box)
         )
 
         self._codec_box = QComboBox()
@@ -121,9 +125,11 @@ class SettingsPage(QWidget):
         self._conflict_box.blockSignals(True)
         self._conflict_box.setCurrentIndex(1 if s.overwrite else 0)
         self._conflict_box.blockSignals(False)
-        self._workers_spin.blockSignals(True)
-        self._workers_spin.setValue(s.max_workers)
-        self._workers_spin.blockSignals(False)
+        self._workers_box.blockSignals(True)
+        self._workers_box.setCurrentIndex(
+            max(0, self._workers_box.findData(s.max_workers))
+        )
+        self._workers_box.blockSignals(False)
         self._codec_box.blockSignals(True)
         self._codec_box.setCurrentText(s.default_video_codec)
         self._codec_box.blockSignals(False)
@@ -152,5 +158,5 @@ class SettingsPage(QWidget):
             self._theme_box, self._codec_box,
         ):
             box.setStyleSheet(theme.input_qss(p))
-        self._workers_spin.setStyleSheet(theme.input_qss(p))
+        self._workers_box.setStyleSheet(theme.input_qss(p))
         self._folder_btn.setStyleSheet(theme.secondary_button_qss(p))
