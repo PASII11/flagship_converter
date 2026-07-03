@@ -17,6 +17,7 @@ class SettingsPage(QWidget):
         self._settings = settings
         self._build_ui()
         self._load_from_settings()
+        settings.changed.connect(self._load_from_settings)
         self.apply_theme()
 
     def _row(self, label_text: str, widget: QWidget) -> QWidget:

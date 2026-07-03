@@ -40,3 +40,10 @@ def test_changing_widgets_updates_settings(app, settings):
         page._output_mode_box.findData("fixed")
     )
     assert settings.output_mode == "fixed"
+
+
+def test_pages_stay_in_sync_via_settings_changed(app, settings):
+    page_a = SettingsPage(settings)
+    page_b = SettingsPage(settings)
+    page_a._theme_box.setCurrentIndex(page_a._theme_box.findData("dark"))
+    assert page_b._theme_box.currentData() == "dark"

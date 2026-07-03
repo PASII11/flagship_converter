@@ -118,6 +118,7 @@ class MainWindow(QMainWindow):
     def _on_settings_changed(self) -> None:
         theme.set_theme_mode(self._settings.theme_mode)
         self._apply_theme()
+        self._engine.set_max_workers(self._settings.max_workers or None)
 
     def _connect_system_theme_listener(self) -> None:
         qapp = QApplication.instance()

@@ -66,3 +66,9 @@ def test_footer_aggregates_after_callbacks(page, tmp_path):
     assert "Готово 1" in text
     assert "Ошибки 1" in text
     assert page._open_folder_btn.isVisibleTo(page)
+
+
+def test_folder_chip_follows_settings(page):
+    page._settings.output_mode = "fixed"
+    page._settings.fixed_output_dir = "C:/out"
+    assert page._command_bar._folder_btn.text() == "C:/out"

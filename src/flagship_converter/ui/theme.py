@@ -226,10 +226,10 @@ QPushButton {{
 }}
 QPushButton:hover {{
     background-color: {p.surface_secondary};
-    border-color: {p.accent};
+    border-color: {p.border_strong};
 }}
 QPushButton:pressed {{
-    background-color: {p.accent_soft};
+    background-color: {p.surface_secondary};
 }}
 QPushButton:disabled {{
     background-color: {p.surface_secondary};
@@ -267,7 +267,7 @@ QPushButton:disabled {{
 def input_qss(p: Palette | None = None) -> str:
     p = p or palette()
     return f"""
-QComboBox, QSpinBox {{
+QComboBox, QSpinBox, QLineEdit {{
     background-color: {p.surface};
     color: {p.text_primary};
     border: 1px solid {p.border_strong};
@@ -276,8 +276,8 @@ QComboBox, QSpinBox {{
     min-height: 26px;
 }}
 
-QComboBox:hover, QSpinBox:hover {{
-    border-color: {p.accent};
+QComboBox:hover, QSpinBox:hover, QLineEdit:hover {{
+    border-color: {p.border_strong};
 }}
 
 QComboBox::drop-down {{
@@ -289,7 +289,7 @@ QComboBox QAbstractItemView {{
     background-color: {p.surface};
     color: {p.text_primary};
     border: 1px solid {p.border};
-    selection-background-color: {p.accent};
+    selection-background-color: {p.running};
     selection-color: #FFFFFF;
     outline: none;
 }}
@@ -321,7 +321,7 @@ QCheckBox::indicator {{
     background-color: {p.surface};
 }}
 QCheckBox::indicator:hover {{
-    border-color: {p.accent};
+    border-color: {p.focus};
 }}
 QCheckBox::indicator:checked {{
     background-color: {p.accent};

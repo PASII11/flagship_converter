@@ -67,7 +67,12 @@ class FileRow(QFrame):
     remove_requested = Signal(str)
     format_changed = Signal(str)
 
-    def __init__(self, file_path: Path, card_id: str | None = None) -> None:
+    def __init__(
+        self,
+        file_path: Path,
+        card_id: str | None = None,
+        default_video_codec: str | None = None,
+    ) -> None:
         super().__init__()
         self.card_id = card_id or str(uuid.uuid4())
         self.file_path = file_path
@@ -79,6 +84,12 @@ class FileRow(QFrame):
         self._expanded = False
         self._applying = False
         self._build_ui()
+        if default_video_codec:
+            self._applying = True
+            try:
+                self._codec.setCurrentText(default_video_codec)
+            finally:
+                self._applying = False
         self.apply_theme()
 
     # -- построение --

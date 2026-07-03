@@ -25,6 +25,9 @@ class ConversionEngine:
             DocConverter(),
         ]
 
+    def set_max_workers(self, value: int | None) -> None:
+        self._max_workers = value
+
     def _effective_workers(self, computed: int) -> int:
         if self._max_workers and self._max_workers > 0:
             return max(1, min(computed, self._max_workers))

@@ -46,12 +46,18 @@ class ConverterPage(QWidget):
         self._current_preset_id = ""
         self._bulk_chips: dict[str, QComboBox] = {}
         self._build_ui()
+        self._queue.default_video_codec = settings.default_video_codec
+        settings.changed.connect(self._on_settings_changed)
         self.apply_theme()
         self._sync_controls()
 
     @property
     def is_converting(self) -> bool:
         return self._converting
+
+    def _on_settings_changed(self) -> None:
+        self._sync_folder_text()
+        self._queue.default_video_codec = self._settings.default_video_codec
 
     def _build_ui(self) -> None:
         col = QVBoxLayout(self)

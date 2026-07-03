@@ -20,6 +20,7 @@ class TaskQueue(QWidget):
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
         self._rows: dict[str, FileRow] = {}
+        self.default_video_codec: str | None = None
 
         self._scroll = QScrollArea()
         self._scroll.setWidgetResizable(True)
@@ -80,7 +81,7 @@ class TaskQueue(QWidget):
             p = Path(raw).resolve()
             if p in existing or not p.is_file():
                 continue
-            row = FileRow(p)
+            row = FileRow(p, default_video_codec=self.default_video_codec)
             row.remove_requested.connect(self._on_remove)
             self._panel_col.addWidget(row)
             self._rows[row.card_id] = row

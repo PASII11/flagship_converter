@@ -63,3 +63,14 @@ def test_remove_row_via_signal(app, tmp_path):
     row.remove_requested.emit(row.card_id)
     assert q.count() == 2
     assert q.get_row(row.card_id) is None
+
+
+def test_default_video_codec_applied_to_new_rows(app, tmp_path):
+    q = TaskQueue()
+    q.default_video_codec = "NVIDIA (NVENC)"
+    f = tmp_path / "v.mkv"
+    f.write_bytes(b"x")
+    q.add_files([f])
+    row = q.rows()[0]
+    assert row.job_params["video_codec"] == "NVIDIA (NVENC)"
+    assert row.is_overridden is False
