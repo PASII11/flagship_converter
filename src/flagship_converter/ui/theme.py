@@ -15,16 +15,17 @@ class ThemeMode(StrEnum):
     DARK = "dark"
 
 
+SPACING = {"xs": 4, "sm": 8, "md": 12, "lg": 16, "xl": 24}
+RADIUS = {"panel": 12, "control": 8}
+
+
 @dataclass(frozen=True)
 class Palette:
     name: str
     is_dark: bool
     app_bg: str
-    app_bg_to: str
     surface: str
     surface_secondary: str
-    surface_elevated: str
-    surface_glass: str
     border: str
     border_strong: str
     text_primary: str
@@ -34,82 +35,76 @@ class Palette:
     accent_hover: str
     accent_pressed: str
     accent_soft: str
+    running: str
+    running_soft: str
+    success: str
+    success_soft: str
+    warning: str
+    warning_soft: str
+    error: str
+    error_soft: str
+    cat_image: str
+    cat_audio: str
+    cat_video: str
+    cat_doc: str
+    focus: str
+    scrollbar: str
+    scrollbar_hover: str
+    # legacy (удаляются в Task 13 вместе со старыми виджетами)
+    app_bg_to: str
+    surface_elevated: str
+    surface_glass: str
     blue: str
     blue_soft: str
     green: str
     green_soft: str
     orange: str
     orange_soft: str
-    error: str
-    error_soft: str
-    focus: str
     shadow: str
-    scrollbar: str
-    scrollbar_hover: str
 
 
 LIGHT = Palette(
-    name="Light",
-    is_dark=False,
-    app_bg="#F8FAFC",
-    app_bg_to="#EEF1F6",
-    surface="#FFFFFF",
-    surface_secondary="#F8F9FC",
-    surface_elevated="#FFFFFF",
-    surface_glass="rgba(255, 255, 255, 0.92)",
-    border="#E5E7EB",
-    border_strong="#D1D5DB",
-    text_primary="#111827",
-    text_secondary="#6B7280",
-    text_muted="#9CA3AF",
-    accent="#E50914",
-    accent_hover="#F0333D",
-    accent_pressed="#B80710",
-    accent_soft="#FDECEC",
-    blue="#3B82F6",
-    blue_soft="#EFF6FF",
-    green="#22C55E",
-    green_soft="#ECFDF3",
-    orange="#F59E0B",
-    orange_soft="#FFFBEB",
-    error="#EF4444",
-    error_soft="#FEF2F2",
-    focus="#FDA4AF",
+    name="Light", is_dark=False,
+    app_bg="#F6F7F9", surface="#FFFFFF", surface_secondary="#F1F3F6",
+    border="#E4E7EC", border_strong="#CBD2DC",
+    text_primary="#14181F", text_secondary="#5C6470", text_muted="#98A1AE",
+    accent="#E50914", accent_hover="#C40812", accent_pressed="#A50710",
+    accent_soft="#FDEBEC",
+    running="#2E7CF6", running_soft="#EAF2FE",
+    success="#1DA55A", success_soft="#E7F6EE",
+    warning="#D97706", warning_soft="#FBF1DF",
+    error="#DC2626", error_soft="#FCEBEB",
+    cat_image="#2E7CF6", cat_audio="#D97706", cat_video="#7C5CFC",
+    cat_doc="#0D9488",
+    focus="#2E7CF6", scrollbar="#CBD2DC", scrollbar_hover="#98A1AE",
+    app_bg_to="#F6F7F9", surface_elevated="#FFFFFF",
+    surface_glass="#FFFFFF",
+    blue="#2E7CF6", blue_soft="#EAF2FE",
+    green="#1DA55A", green_soft="#E7F6EE",
+    orange="#D97706", orange_soft="#FBF1DF",
     shadow="#1F2937",
-    scrollbar="#CBD5E1",
-    scrollbar_hover="#94A3B8",
 )
 
 DARK = Palette(
-    name="Dark",
-    is_dark=True,
-    app_bg="#0F1115",
-    app_bg_to="#171A21",
-    surface="#171A21",
-    surface_secondary="#1F2430",
-    surface_elevated="#232936",
-    surface_glass="rgba(35, 41, 54, 0.90)",
-    border="#343A46",
-    border_strong="#475569",
-    text_primary="#F9FAFB",
-    text_secondary="#A1A1AA",
-    text_muted="#71717A",
-    accent="#E50914",
-    accent_hover="#FF3341",
-    accent_pressed="#B80710",
-    accent_soft="#2A1216",
-    blue="#60A5FA",
-    blue_soft="#172033",
-    green="#4ADE80",
-    green_soft="#102418",
-    orange="#FBBF24",
-    orange_soft="#2B2110",
-    error="#F87171",
-    error_soft="#2A1216",
-    focus="#FB7185",
+    name="Dark", is_dark=True,
+    app_bg="#101216", surface="#171A20", surface_secondary="#1E232B",
+    border="#2A303B", border_strong="#3D4553",
+    text_primary="#F2F4F8", text_secondary="#9AA3B2", text_muted="#6B7482",
+    accent="#E50914", accent_hover="#FF2B35", accent_pressed="#B80710",
+    accent_soft="#33161A",
+    running="#5B9BFF", running_soft="#16233B",
+    success="#34C97B", success_soft="#12291C",
+    warning="#F2A33C", warning_soft="#2E2312",
+    error="#F26D6D", error_soft="#33181A",
+    cat_image="#5B9BFF", cat_audio="#F2A33C", cat_video="#9D86FF",
+    cat_doc="#2CC7B2",
+    focus="#5B9BFF", scrollbar="#3D4553", scrollbar_hover="#6B7482",
+    app_bg_to="#101216", surface_elevated="#1E232B",
+    surface_glass="#171A20",
+    blue="#5B9BFF", blue_soft="#16233B",
+    green="#34C97B", green_soft="#12291C",
+    orange="#F2A33C", orange_soft="#2E2312",
     shadow="#000000",
-    scrollbar="#475569",
-    scrollbar_hover="#64748B",
 )
 
 _mode = ThemeMode.SYSTEM
@@ -165,7 +160,7 @@ QMainWindow {{
 
 QWidget {{
     color: {p.text_primary};
-    font-family: "Segoe UI Variable", "SF Pro Display", "Segoe UI";
+    font-family: "Segoe UI Variable Text", "Segoe UI", sans-serif;
     font-size: 13px;
     letter-spacing: 0px;
 }}
@@ -178,20 +173,13 @@ QPushButton {{
     min-height: 34px;
     border-radius: 8px;
     padding: 0 14px;
-    font-weight: 650;
+    font-weight: 600;
     letter-spacing: 0px;
 }}
 
 QPushButton:focus, QComboBox:focus, QSpinBox:focus {{
     outline: none;
     border: 2px solid {p.focus};
-}}
-
-QStatusBar {{
-    background-color: {p.app_bg};
-    color: {p.text_secondary};
-    border-top: 1px solid {p.border};
-    padding-left: 8px;
 }}
 
 QToolTip {{
@@ -208,19 +196,18 @@ def root_qss(p: Palette | None = None) -> str:
     p = p or palette()
     return f"""
 QWidget#Root {{
-    background: qlineargradient(
-        x1: 0, y1: 0, x2: 1, y2: 1,
-        stop: 0 {p.app_bg}, stop: 1 {p.app_bg_to}
-    );
+    background-color: {p.app_bg};
 }}
 """
 
 
-def panel_qss(object_name: str = "Panel", p: Palette | None = None, radius: int = 18) -> str:
+def panel_qss(object_name: str = "Panel", p: Palette | None = None, radius: int | None = None) -> str:
     p = p or palette()
+    if radius is None:
+        radius = RADIUS["panel"]
     return f"""
 QFrame#{object_name} {{
-    background-color: {p.surface_glass};
+    background-color: {p.surface};
     border: 1px solid {p.border};
     border-radius: {radius}px;
 }}
@@ -274,12 +261,11 @@ def primary_button_qss(p: Palette | None = None) -> str:
     p = p or palette()
     return f"""
 QPushButton {{
-    background: qlineargradient(
-        x1: 0, y1: 0, x2: 1, y2: 0,
-        stop: 0 {p.accent_hover}, stop: 1 {p.accent}
-    );
+    background-color: {p.accent};
     color: #FFFFFF;
     border: 1px solid {p.accent};
+    min-height: 40px;
+    font-weight: 600;
 }}
 QPushButton:hover {{
     background-color: {p.accent_hover};
@@ -465,10 +451,9 @@ def category_badge_style(fg: str, bg: str, border: str) -> str:
 
 def progress_qss(color: str, p: Palette | None = None) -> str:
     p = p or palette()
-    track = "#E8EEF6" if not p.is_dark else "#2C3442"
     return (
         "QProgressBar {"
-        f"border: none; background-color: {track}; border-radius: 3px;"
+        f"border: none; background-color: {p.surface_secondary}; border-radius: 3px;"
         "}"
         f"QProgressBar::chunk {{ background-color: {color}; border-radius: 3px; }}"
     )
@@ -483,3 +468,36 @@ def make_shadow(p: Palette | None = None, blur: int = 28, y: int = 10) -> QGraph
     color.setAlpha(34 if not p.is_dark else 70)
     shadow.setColor(color)
     return shadow
+
+
+def chip_qss(fg: str, bg: str) -> str:
+    return (
+        "QComboBox, QLabel {"
+        f"color: {fg}; background-color: {bg}; border: none;"
+        "border-radius: 12px; padding: 3px 12px;"
+        "font-size: 12px; font-weight: 600; min-height: 24px;"
+        "}"
+        "QComboBox::drop-down { border: none; width: 18px; }"
+    )
+
+
+def nav_button_qss(selected: bool, p: Palette | None = None) -> str:
+    p = p or palette()
+    if selected:
+        return (
+            "QPushButton {"
+            f"background-color: {p.surface_secondary}; color: {p.text_primary};"
+            f"border: 1px solid {p.border}; border-radius: {RADIUS['control']}px;"
+            "padding: 0 16px; font-weight: 600;"
+            "}"
+        )
+    return (
+        "QPushButton {"
+        f"background-color: transparent; color: {p.text_secondary};"
+        f"border: 1px solid transparent; border-radius: {RADIUS['control']}px;"
+        "padding: 0 16px; font-weight: 400;"
+        "}"
+        "QPushButton:hover {"
+        f"color: {p.text_primary}; background-color: {p.surface_secondary};"
+        "}"
+    )
