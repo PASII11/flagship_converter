@@ -1,0 +1,363 @@
+"""Страница-верстак: командная строка, bulk-операции, очередь, футер."""
+from __future__ import annotations
+
+import threading
+from pathlib import Path
+
+from PySide6.QtCore import Qt, QThreadPool, QUrl
+from PySide6.QtGui import QDesktopServices
+from PySide6.QtWidgets import (
+    QComboBox, QFileDialog, QHBoxLayout, QLabel, QProgressBar,
+    QPushButton, QVBoxLayout, QWidget,
+)
+
+from flagship_converter.core.engine import ConversionEngine
+from flagship_converter.core.models import ConversionPlan, JobStatus
+from flagship_converter.ui import theme
+from flagship_converter.ui.presets import PresetStore
+from flagship_converter.ui.settings import AppSettings
+from flagship_converter.ui.widgets.command_bar import CommandBar
+from flagship_converter.ui.widgets.file_row import OUTPUT_FORMATS
+from flagship_converter.ui.widgets.task_queue import TaskQueue
+from flagship_converter.ui.workers import PlanRunner
+
+CATEGORY_LABELS = {
+    "image": "Изображения", "audio": "Аудио",
+    "video": "Видео", "doc": "Документы",
+}
+
+
+class ConverterPage(QWidget):
+    def __init__(
+        self,
+        engine: ConversionEngine,
+        settings: AppSettings,
+        store: PresetStore,
+    ) -> None:
+        super().__init__()
+        self._engine = engine
+        self._settings = settings
+        self._store = store
+        self._converting = False
+        self._cancel_event: threading.Event | None = None
+        self._active_runner: PlanRunner | None = None
+        self._job_row_map: dict[str, str] = {}
+        self._progress_by_job: dict[str, int] = {}
+        self._current_preset_id = ""
+        self._bulk_chips: dict[str, QComboBox] = {}
+        self._build_ui()
+        self.apply_theme()
+        self._sync_controls()
+
+    @property
+    def is_converting(self) -> bool:
+        return self._converting
+
+    def _build_ui(self) -> None:
+        col = QVBoxLayout(self)
+        col.setContentsMargins(0, 0, 0, 0)
+        col.setSpacing(theme.SPACING["lg"])
+
+        self._command_bar = CommandBar()
+        self._command_bar.add_files_clicked.connect(self._pick_files)
+        self._command_bar.preset_selected.connect(self.apply_preset_by_id)
+        self._command_bar.folder_clicked.connect(self._pick_folder)
+        self._command_bar.convert_clicked.connect(self._start_conversion)
+        self._command_bar.cancel_clicked.connect(self._cancel_conversion)
+        self._command_bar.set_presets(self._store.presets())
+        col.addWidget(self._command_bar)
+
+        self._bulk_row = QWidget()
+        self._bulk_layout = QHBoxLayout(self._bulk_row)
+        self._bulk_layout.setContentsMargins(theme.SPACING["xs"], 0, 0, 0)
+        self._bulk_layout.setSpacing(theme.SPACING["sm"])
+        self._bulk_caption = QLabel("Формат для всех:")
+        self._bulk_layout.addWidget(self._bulk_caption)
+        self._bulk_layout.addStretch()
+        self._bulk_row.setVisible(False)
+        col.addWidget(self._bulk_row)
+
+        self._queue = TaskQueue()
+        self._queue.files_changed.connect(self._on_files_changed)
+        self._queue.add_clicked.connect(self._pick_files)
+        col.addWidget(self._queue, stretch=1)
+
+        footer = QWidget()
+        f = QHBoxLayout(footer)
+        f.setContentsMargins(theme.SPACING["xs"], 0, theme.SPACING["xs"], 0)
+        f.setSpacing(theme.SPACING["md"])
+        self._footer_label = QLabel("Добавьте файлы или перетащите их в окно")
+        self._overall = QProgressBar()
+        self._overall.setRange(0, 100)
+        self._overall.setTextVisible(False)
+        self._overall.setFixedHeight(4)
+        self._percent_label = QLabel("")
+        self._open_folder_btn = QPushButton("Открыть папку вывода")
+        self._open_folder_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._open_folder_btn.setVisible(False)
+        self._open_folder_btn.clicked.connect(self._open_output_folder)
+        f.addWidget(self._footer_label)
+        f.addWidget(self._overall, stretch=1)
+        f.addWidget(self._percent_label)
+        f.addWidget(self._open_folder_btn)
+        col.addWidget(footer)
+
+        self._store.changed.connect(
+            lambda: self._command_bar.set_presets(
+                self._store.presets(), self._current_preset_id
+            )
+        )
+        self._sync_folder_text()
+
+    # -- файлы и пресеты --
+
+    def add_files(self, paths: list[str]) -> None:
+        if self._converting:
+            return
+        added = self._queue.add_files(paths)
+        if added and self._current_preset_id:
+            preset = self._store.get(self._current_preset_id)
+            if preset:
+                self._queue.apply_preset(preset)
+
+    def apply_preset_by_id(self, preset_id: str) -> None:
+        self._current_preset_id = preset_id
+        preset = self._store.get(preset_id) if preset_id else None
+        if preset:
+            self._queue.apply_preset(preset)
+
+    def _pick_files(self) -> None:
+        if self._converting:
+            return
+        paths, _ = QFileDialog.getOpenFileNames(
+            self, "Выберите файлы для конвертации"
+        )
+        if paths:
+            self.add_files(paths)
+
+    def _pick_folder(self) -> None:
+        folder = QFileDialog.getExistingDirectory(
+            self, "Выберите папку для сохранения"
+        )
+        if folder:
+            self._settings.output_mode = "fixed"
+            self._settings.fixed_output_dir = folder
+            self._sync_folder_text()
+
+    def _sync_folder_text(self) -> None:
+        if self._settings.output_mode == "fixed" and self._settings.fixed_output_dir:
+            self._command_bar.set_folder_text(self._settings.fixed_output_dir)
+        else:
+            self._command_bar.set_folder_text("converted/ рядом с исходником")
+
+    def _output_dir_for(self, row_path: Path) -> Path:
+        if self._settings.output_mode == "fixed" and self._settings.fixed_output_dir:
+            return Path(self._settings.fixed_output_dir)
+        return row_path.parent / "converted"
+
+    # -- bulk-чипы --
+
+    def _rebuild_bulk_chips(self) -> None:
+        for chip in self._bulk_chips.values():
+            chip.setParent(None)
+            chip.deleteLater()
+        self._bulk_chips.clear()
+        categories = sorted(self._queue.categories_present())
+        for category in categories:
+            chip = QComboBox()
+            chip.addItems(OUTPUT_FORMATS[category])
+            chip.setToolTip(CATEGORY_LABELS.get(category, category))
+            chip.currentTextChanged.connect(
+                lambda ext, c=category: self._queue.bulk_set_format(c, ext)
+            )
+            chip.setStyleSheet(theme.input_qss())
+            self._bulk_layout.insertWidget(
+                self._bulk_layout.count() - 1, chip
+            )
+            self._bulk_chips[category] = chip
+        self._bulk_row.setVisible(bool(categories))
+
+    def _on_files_changed(self, _count: int) -> None:
+        self._rebuild_bulk_chips()
+        self._sync_controls()
+
+    def _sync_controls(self) -> None:
+        convertible = self._queue.convertible_count()
+        self._command_bar.set_convert_count(convertible)
+        self._command_bar.set_convert_enabled(
+            convertible > 0 and not self._converting
+        )
+        if self._queue.count() == 0:
+            self._footer_label.setText(
+                "Добавьте файлы или перетащите их в окно"
+            )
+            self._overall.setValue(0)
+            self._percent_label.setText("")
+            self._open_folder_btn.setVisible(False)
+
+    # -- конвертация (порт из старого MainWindow) --
+
+    def _start_conversion(self) -> None:
+        if self._converting:
+            return
+        plan = ConversionPlan()
+        self._job_row_map.clear()
+        self._progress_by_job.clear()
+        reserved: set[Path] = set()
+        for row in self._queue.rows():
+            if not row.is_convertible():
+                continue
+            job = self._engine.build_job(
+                file_path=row.file_path,
+                output_dir=self._output_dir_for(row.file_path),
+                target_ext=row.target_ext,
+                overwrite=self._settings.overwrite,
+                params=row.job_params,
+                reserved_outputs=reserved,
+            )
+            if job:
+                plan.jobs.append(job)
+                self._job_row_map[job.id] = row.card_id
+                self._progress_by_job[job.id] = 0
+                row.set_output_path(job.output_path)
+                row.set_status(JobStatus.PENDING)
+                row.set_progress(0)
+            else:
+                row.set_error("Выбранный формат недоступен для этого файла.")
+        if not plan.jobs:
+            self._footer_label.setText("Нет поддерживаемых файлов для конвертации")
+            return
+
+        self._cancel_event = threading.Event()
+        self._set_converting(True)
+        runner = PlanRunner(plan, self._engine, self._cancel_event)
+        self._active_runner = runner
+        runner.signals.job_started.connect(self._on_job_started)
+        runner.signals.job_progress.connect(self._on_job_progress)
+        runner.signals.job_finished.connect(self._on_job_finished)
+        runner.signals.job_failed.connect(self._on_job_failed)
+        runner.signals.job_cancelled.connect(self._on_job_cancelled)
+        runner.signals.all_done.connect(self._on_all_done)
+        QThreadPool.globalInstance().start(runner)
+
+    def _cancel_conversion(self) -> None:
+        if self._cancel_event:
+            self._cancel_event.set()
+        self._footer_label.setText("Останавливаю текущие задачи…")
+
+    def _set_converting(self, converting: bool) -> None:
+        self._converting = converting
+        self._command_bar.set_converting(converting)
+        self._queue.lock_all(converting)
+        for chip in self._bulk_chips.values():
+            chip.setEnabled(not converting)
+        if not converting:
+            self._sync_controls()
+
+    def _row_for(self, job_id: str):
+        card_id = self._job_row_map.get(job_id)
+        return self._queue.get_row(card_id) if card_id else None
+
+    def _on_job_started(self, job_id: str) -> None:
+        self._progress_by_job[job_id] = max(
+            self._progress_by_job.get(job_id, 0), 1
+        )
+        if row := self._row_for(job_id):
+            row.set_status(JobStatus.RUNNING)
+        self._update_overall()
+
+    def _on_job_progress(self, job_id: str, percent: int) -> None:
+        self._progress_by_job[job_id] = max(0, min(percent, 100))
+        if row := self._row_for(job_id):
+            row.set_progress(percent)
+        self._update_overall()
+
+    def _on_job_finished(self, job_id: str) -> None:
+        self._progress_by_job[job_id] = 100
+        if row := self._row_for(job_id):
+            row.set_progress(100)
+            row.set_status(JobStatus.DONE)
+            if row.output_path:
+                row.set_output_path(row.output_path)
+        self._update_overall()
+
+    def _on_job_failed(self, job_id: str, error: str) -> None:
+        self._progress_by_job[job_id] = 100
+        if row := self._row_for(job_id):
+            row.set_progress(100)
+            row.set_error(error)
+        self._update_overall()
+
+    def _on_job_cancelled(self, job_id: str) -> None:
+        self._progress_by_job[job_id] = 100
+        if row := self._row_for(job_id):
+            row.set_status(JobStatus.CANCELLED)
+        self._update_overall()
+
+    def _on_all_done(self) -> None:
+        self._set_converting(False)
+        self._active_runner = None
+        self._cancel_event = None
+        statuses = [
+            row.status
+            for card_id in self._job_row_map.values()
+            if (row := self._queue.get_row(card_id))
+        ]
+        done = sum(1 for s in statuses if s == JobStatus.DONE)
+        failed = sum(1 for s in statuses if s == JobStatus.FAILED)
+        cancelled = sum(1 for s in statuses if s == JobStatus.CANCELLED)
+        parts = [f"Готово {done}"]
+        if failed:
+            parts.append(f"Ошибки {failed}")
+        if cancelled:
+            parts.append(f"Отменено {cancelled}")
+        self._footer_label.setText(" · ".join(parts))
+        if statuses:
+            self._overall.setValue(100)
+            self._percent_label.setText("100%")
+            self._open_folder_btn.setVisible(done > 0)
+
+    def _update_overall(self) -> None:
+        if not self._progress_by_job:
+            self._overall.setValue(0)
+            self._percent_label.setText("")
+            return
+        percent = round(
+            sum(self._progress_by_job.values()) / len(self._progress_by_job)
+        )
+        self._overall.setValue(percent)
+        self._percent_label.setText(f"{percent}%")
+        running = sum(
+            1 for card_id in self._job_row_map.values()
+            if (r := self._queue.get_row(card_id))
+            and r.status == JobStatus.RUNNING
+        )
+        done = sum(
+            1 for card_id in self._job_row_map.values()
+            if (r := self._queue.get_row(card_id))
+            and r.status == JobStatus.DONE
+        )
+        self._footer_label.setText(f"Готово {done} · В работе {running}")
+
+    def _open_output_folder(self) -> None:
+        for card_id in self._job_row_map.values():
+            row = self._queue.get_row(card_id)
+            if row and row.status == JobStatus.DONE and row.output_path:
+                QDesktopServices.openUrl(
+                    QUrl.fromLocalFile(str(row.output_path.parent))
+                )
+                return
+
+    # -- вид --
+
+    def apply_theme(self, p: theme.Palette | None = None) -> None:
+        p = p or theme.palette()
+        self._command_bar.apply_theme(p)
+        self._queue.apply_theme(p)
+        self._bulk_caption.setStyleSheet(theme.text_style(p.text_muted, 12, 400))
+        for chip in self._bulk_chips.values():
+            chip.setStyleSheet(theme.input_qss(p))
+        self._footer_label.setStyleSheet(theme.text_style(p.text_secondary, 12, 400))
+        self._percent_label.setStyleSheet(theme.text_style(p.text_secondary, 13, 600))
+        self._overall.setStyleSheet(theme.progress_qss(p.running, p))
+        self._open_folder_btn.setStyleSheet(theme.secondary_button_qss(p))
