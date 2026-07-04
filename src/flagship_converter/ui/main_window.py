@@ -138,7 +138,9 @@ class MainWindow(QMainWindow):
 
     def _apply_theme(self) -> None:
         p = theme.palette()
-        self.setStyleSheet(theme.app_qss(p))
+        qapp = QApplication.instance()
+        if qapp is not None:
+            qapp.setStyleSheet(theme.app_qss(p))
         self.centralWidget().setStyleSheet(theme.root_qss(p))
         self._brand_mark.setStyleSheet(
             f"color: #FFFFFF; background-color: {p.accent};"

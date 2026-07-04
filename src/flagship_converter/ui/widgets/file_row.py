@@ -92,6 +92,7 @@ class FileRow(QFrame):
             finally:
                 self._applying = False
         self.apply_theme()
+        self.set_expanded(True)
 
 
     def _build_ui(self) -> None:
@@ -360,7 +361,7 @@ class FileRow(QFrame):
         self._expand_btn.setText("▴" if expanded else "▾")
         target = self._details.sizeHint().height() if expanded else 0
         self._anim.stop()
-        self._anim.setStartValue(self._details.maximumHeight())
+        self._anim.setStartValue(self._details.height())
         self._anim.setEndValue(target)
         self._anim.start()
 
@@ -433,8 +434,15 @@ class FileRow(QFrame):
         self._error_label.setStyleSheet(theme.text_style(p.error, 12, 400))
         self._result_label.setStyleSheet(theme.text_style(p.text_secondary, 12, 400))
         self._expand_btn.setStyleSheet(
-            theme.ghost_button_qss(p)
-            + "QPushButton { padding: 0; min-height: 28px; font-size: 14px; }"
+            "QPushButton {"
+            f"color: {p.text_secondary}; background-color: {p.surface_secondary};"
+            f"border: 1px solid {p.border_strong};"
+            f"border-radius: {theme.RADIUS['control']}px;"
+            "padding: 0; min-height: 28px; font-size: 12px;"
+            "}"
+            "QPushButton:hover {"
+            f"color: {p.text_primary}; border-color: {p.text_muted};"
+            "}"
         )
         self._remove_btn.setStyleSheet(
             "QPushButton {"

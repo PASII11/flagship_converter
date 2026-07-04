@@ -34,6 +34,7 @@ def test_default_format_and_convertible(app, tmp_path):
     assert row.is_convertible()
     assert row.target_ext == "webp"
     assert row.is_overridden is False
+    assert row._expanded is True
 
 
 def test_set_target_format_does_not_override(app, tmp_path):

@@ -159,9 +159,9 @@ QPushButton:focus, QComboBox:focus, QSpinBox:focus {{
 }}
 
 QToolTip {{
-    background-color: {p.text_primary};
-    color: {p.surface};
-    border: none;
+    background-color: {p.surface};
+    color: {p.text_primary};
+    border: 1px solid {p.border_strong};
     border-radius: 6px;
     padding: 6px 8px;
 }}
