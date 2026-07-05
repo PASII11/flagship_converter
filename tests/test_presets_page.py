@@ -26,6 +26,17 @@ def test_new_preset_via_editor(app, tmp_path):
     assert len(page._cards) == 1
 
 
+def test_editor_saves_only_configured_types(app, tmp_path):
+    store = PresetStore(tmp_path / "p.json")
+    page = PresetsPage(store)
+    page._start_new()
+    page._name_edit.setText("Только картинки")
+    page._fmt_box.setCurrentText("webp")
+    page._save_editor()
+    preset = store.user_presets()[0]
+    assert preset.formats == {"image": "webp"}
+
+
 def test_apply_signal(app, tmp_path):
     page = PresetsPage(PresetStore(tmp_path / "p.json"))
     got: list[str] = []

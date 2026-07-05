@@ -20,14 +20,20 @@ _CATEGORY_LABELS = {
 }
 
 
+_NO_FORMAT = "—"
+
+
 def _summary(preset: Preset) -> str:
-    fmts = " · ".join(
-        preset.formats.get(c, "—") for c in _CATEGORIES
-    )
-    return (
-        f"{fmts} · качество {preset.image_quality}"
-        f" · {preset.audio_bitrate} · {preset.video_bitrate}"
-    )
+    parts = [
+        preset.formats[c] for c in _CATEGORIES if preset.formats.get(c)
+    ]
+    if preset.formats.get("image"):
+        parts.append(f"качество {preset.image_quality}")
+    if preset.formats.get("audio"):
+        parts.append(preset.audio_bitrate)
+    if preset.formats.get("video"):
+        parts.append(preset.video_bitrate)
+    return " · ".join(parts) if parts else "пустой пресет"
 
 
 class PresetsPage(QWidget):
@@ -38,9 +44,7 @@ class PresetsPage(QWidget):
         self._store = store
         self._cards: list[QFrame] = []
         self._editing_id: str | None = None
-        self._editor_formats: dict[str, str] = {
-            c: OUTPUT_FORMATS[c][0] for c in _CATEGORIES
-        }
+        self._editor_formats: dict[str, str] = {}
         self._build_ui()
         self._on_editor_category(0)
         self._rebuild_cards()
@@ -202,32 +206,41 @@ class PresetsPage(QWidget):
         category = str(self._cat_box.currentData() or "image")
         self._fmt_box.blockSignals(True)
         self._fmt_box.clear()
+        self._fmt_box.addItem(_NO_FORMAT)
         self._fmt_box.addItems(OUTPUT_FORMATS[category])
         self._fmt_box.setCurrentText(
-            self._editor_formats.get(category, OUTPUT_FORMATS[category][0])
+            self._editor_formats.get(category, _NO_FORMAT)
         )
         self._fmt_box.blockSignals(False)
+        self._sync_editor_params()
+
+    def _on_editor_format(self, fmt: str) -> None:
+        category = str(self._cat_box.currentData() or "")
+        if not category:
+            return
+        if fmt and fmt != _NO_FORMAT:
+            self._editor_formats[category] = fmt
+        else:
+            self._editor_formats.pop(category, None)
+        self._sync_editor_params()
+
+    def _sync_editor_params(self) -> None:
+        category = str(self._cat_box.currentData() or "")
+        enabled = category in self._editor_formats
         for w in (self._quality_label, self._quality):
-            w.setVisible(category == "image")
+            w.setVisible(enabled and category == "image")
         for w in (self._abitrate_label, self._abitrate):
-            w.setVisible(category == "audio")
+            w.setVisible(enabled and category == "audio")
         for w in (
             self._vbitrate_label, self._vbitrate,
             self._codec_label, self._codec,
         ):
-            w.setVisible(category == "video")
-
-    def _on_editor_format(self, fmt: str) -> None:
-        category = str(self._cat_box.currentData() or "")
-        if category and fmt:
-            self._editor_formats[category] = fmt
+            w.setVisible(enabled and category == "video")
 
     def _start_new(self) -> None:
         self._editing_id = None
         self._name_edit.setText("")
-        self._editor_formats = {
-            c: OUTPUT_FORMATS[c][0] for c in _CATEGORIES
-        }
+        self._editor_formats = {}
         self._quality.setValue(85)
         self._abitrate.setCurrentText("192k")
         self._vbitrate.setCurrentText("2.5M")
@@ -243,8 +256,7 @@ class PresetsPage(QWidget):
         self._editing_id = preset_id
         self._name_edit.setText(preset.name)
         self._editor_formats = {
-            c: preset.formats.get(c, OUTPUT_FORMATS[c][0])
-            for c in _CATEGORIES
+            c: f for c, f in preset.formats.items() if f
         }
         self._quality.setValue(preset.image_quality)
         self._abitrate.setCurrentText(preset.audio_bitrate)

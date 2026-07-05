@@ -289,11 +289,12 @@ class FileRow(QFrame):
             self._applying = False
 
     def apply_preset(self, preset: Preset) -> None:
+        ext = preset.formats.get(self.category, "")
+        if ext not in OUTPUT_FORMATS.get(self.category, []):
+            return
         self._applying = True
         try:
-            ext = preset.formats.get(self.category, "")
-            if ext in OUTPUT_FORMATS.get(self.category, []):
-                self._format_box.setCurrentText(ext)
+            self._format_box.setCurrentText(ext)
             self._quality.setValue(preset.image_quality)
             self._abitrate.setCurrentText(preset.audio_bitrate)
             self._vbitrate.setCurrentText(preset.video_bitrate)
