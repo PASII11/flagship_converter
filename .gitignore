@@ -14,3 +14,6 @@ wheels/
 
 # SDD scratch
 .superpowers/
+
+# Claude Code local settings
+.claude/
