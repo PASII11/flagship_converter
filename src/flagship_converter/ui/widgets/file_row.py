@@ -303,12 +303,14 @@ class FileRow(QFrame):
             self._applying = False
 
     def set_presets(self, presets: list[Preset]) -> None:
-        self._presets = list(presets)
+        self._presets = [
+            p for p in presets if p.formats.get(self.category)
+        ]
         current = str(self._preset_box.currentData() or "")
         self._preset_box.blockSignals(True)
         self._preset_box.clear()
         self._preset_box.addItem("Свои настройки", "")
-        for preset in presets:
+        for preset in self._presets:
             self._preset_box.addItem(preset.name, preset.id)
         self._preset_box.setCurrentIndex(
             max(0, self._preset_box.findData(current))

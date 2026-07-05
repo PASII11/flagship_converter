@@ -55,6 +55,17 @@ def test_apply_preset_sets_format_and_params(app, tmp_path):
     assert row.job_params["quality"] == 70
 
 
+def test_preset_combo_filtered_by_category(app, tmp_path):
+    row = FileRow(_img(tmp_path))
+    row.set_presets([
+        Preset(id="i", name="Img", builtin=False, formats={"image": "png"}),
+        Preset(id="v", name="Vid", builtin=False, formats={"video": "mp4"}),
+    ])
+    assert row._preset_box.count() == 2
+    assert row._preset_box.findData("i") == 1
+    assert row._preset_box.findData("v") == -1
+
+
 def test_format_change_resets_done_status(app, tmp_path):
     row = FileRow(_img(tmp_path))
     row.set_status(JobStatus.DONE)
