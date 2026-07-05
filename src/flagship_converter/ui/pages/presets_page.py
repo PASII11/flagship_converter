@@ -111,6 +111,7 @@ class PresetsPage(QWidget):
         params_row.setSpacing(theme.SPACING["sm"])
         self._quality_label = QLabel("Качество")
         self._quality = QSpinBox()
+        self._quality.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
         self._quality.setRange(1, 95)
         self._quality.setValue(85)
         self._abitrate_label = QLabel("Битрейт аудио")

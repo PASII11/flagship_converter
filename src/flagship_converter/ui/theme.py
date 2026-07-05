@@ -295,13 +295,8 @@ QComboBox QAbstractItemView {{
 }}
 
 QSpinBox::up-button, QSpinBox::down-button {{
+    width: 0;
     border: none;
-    background: transparent;
-    width: 18px;
-}}
-
-QSpinBox::up-button:hover, QSpinBox::down-button:hover {{
-    background-color: {p.accent_soft};
 }}
 """
 
