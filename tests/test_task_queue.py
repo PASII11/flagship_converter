@@ -81,10 +81,20 @@ def test_pending_count_excludes_done(app, tmp_path):
 
 def test_default_video_codec_applied_to_new_rows(app, tmp_path):
     q = TaskQueue()
-    q.default_video_codec = "NVIDIA (NVENC)"
+    q.default_video_codec = "nvidia"
     f = tmp_path / "v.mkv"
     f.write_bytes(b"x")
     q.add_files([f])
     row = q.rows()[0]
-    assert row.job_params["video_codec"] == "NVIDIA (NVENC)"
+    assert row.job_params["video_codec"] == "nvidia"
     assert row.is_overridden is False
+
+
+def test_retranslate_updates_empty_state(app, tmp_path):
+    from flagship_converter import i18n
+
+    q = TaskQueue()
+    i18n.set_language("en")
+    q.retranslate()
+    assert q._empty_title.text() == "Drag files here"
+    assert q._empty_btn.text() == "Choose files"

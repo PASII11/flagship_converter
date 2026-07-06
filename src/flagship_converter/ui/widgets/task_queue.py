@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
 )
 
 from flagship_converter.core.models import JobStatus
+from flagship_converter.i18n import t
 from flagship_converter.ui import theme
 from flagship_converter.ui.presets import Preset
 from flagship_converter.ui.widgets.file_row import FileRow
@@ -61,11 +62,11 @@ class TaskQueue(QWidget):
         col = QVBoxLayout(frame)
         col.setAlignment(Qt.AlignmentFlag.AlignCenter)
         col.setSpacing(theme.SPACING["sm"])
-        self._empty_title = QLabel("Перетащите файлы сюда")
+        self._empty_title = QLabel(t("Перетащите файлы сюда"))
         self._empty_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._empty_sub = QLabel("или нажмите кнопку, чтобы выбрать вручную")
+        self._empty_sub = QLabel(t("или нажмите кнопку, чтобы выбрать вручную"))
         self._empty_sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
-        self._empty_btn = QPushButton("Выбрать файлы")
+        self._empty_btn = QPushButton(t("Выбрать файлы"))
         self._empty_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._empty_btn.setFixedHeight(34)
         self._empty_btn.clicked.connect(self.add_clicked.emit)
@@ -153,6 +154,12 @@ class TaskQueue(QWidget):
     def has_convertible_files(self) -> bool:
         return self.convertible_count() > 0
 
+    def retranslate(self) -> None:
+        self._empty_title.setText(t("Перетащите файлы сюда"))
+        self._empty_sub.setText(t("или нажмите кнопку, чтобы выбрать вручную"))
+        self._empty_btn.setText(t("Выбрать файлы"))
+        for row in self._rows.values():
+            row.retranslate()
 
     def apply_theme(self, p: theme.Palette | None = None) -> None:
         p = p or theme.palette()
