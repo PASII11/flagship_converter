@@ -413,24 +413,28 @@ class FileRow(QFrame):
 
 
     def retranslate(self) -> None:
-        self._meta.setText(f"{t(CATEGORY_TITLES[self.category])} · {self._size_text}")
-        self._remove_btn.setToolTip(t("Убрать файл из очереди"))
-        self._preset_label.setText(t("Пресет"))
-        self._preset_box.setItemText(0, t("Свои настройки"))
-        self._quality_label.setText(t("Качество"))
-        self._abitrate_label.setText(t("Битрейт аудио"))
-        self._vbitrate_label.setText(t("Битрейт видео"))
-        self._codec_label.setText(t("Кодек"))
-        for i, codec_id in enumerate(VIDEO_CODEC_IDS):
-            self._codec.setItemText(i, t(VIDEO_CODEC_LABELS[codec_id]))
-        self._reset_btn.setText(t("Сбросить к пресету"))
-        self._copy_btn.setText(t("Копировать текст ошибки"))
-        self._open_btn.setText(t("Открыть"))
-        self._folder_btn.setText(t("Папка"))
-        if self._last_error:
-            self._error_label.setText(
-                t("Не удалось конвертировать: {error}").format(error=self._last_error)
-            )
+        self._applying = True
+        try:
+            self._meta.setText(f"{t(CATEGORY_TITLES[self.category])} · {self._size_text}")
+            self._remove_btn.setToolTip(t("Убрать файл из очереди"))
+            self._preset_label.setText(t("Пресет"))
+            self._preset_box.setItemText(0, t("Свои настройки"))
+            self._quality_label.setText(t("Качество"))
+            self._abitrate_label.setText(t("Битрейт аудио"))
+            self._vbitrate_label.setText(t("Битрейт видео"))
+            self._codec_label.setText(t("Кодек"))
+            for i, codec_id in enumerate(VIDEO_CODEC_IDS):
+                self._codec.setItemText(i, t(VIDEO_CODEC_LABELS[codec_id]))
+            self._reset_btn.setText(t("Сбросить к пресету"))
+            self._copy_btn.setText(t("Копировать текст ошибки"))
+            self._open_btn.setText(t("Открыть"))
+            self._folder_btn.setText(t("Папка"))
+            if self._last_error:
+                self._error_label.setText(
+                    t("Не удалось конвертировать: {error}").format(error=self._last_error)
+                )
+        finally:
+            self._applying = False
 
     def apply_theme(self, p: theme.Palette | None = None) -> None:
         p = p or theme.palette()

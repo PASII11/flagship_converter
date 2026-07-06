@@ -122,6 +122,18 @@ def test_retranslate_updates_labels_and_error(app, tmp_path):
     assert row._error_label.text() == "Conversion failed: disk full"
 
 
+def test_retranslate_does_not_mark_row_as_overridden(app, tmp_path):
+    from flagship_converter import i18n
+
+    f = tmp_path / "v.mkv"
+    f.write_bytes(b"x")
+    row = FileRow(f)
+    assert row.is_overridden is False
+    i18n.set_language("en")
+    row.retranslate()
+    assert row.is_overridden is False
+
+
 def test_construct_time_translation(app, tmp_path):
     from flagship_converter import i18n
 
