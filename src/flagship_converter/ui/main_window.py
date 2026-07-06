@@ -4,8 +4,14 @@ from __future__ import annotations
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import (
-    QApplication, QHBoxLayout, QLabel, QMainWindow, QPushButton,
-    QStackedWidget, QVBoxLayout, QWidget,
+    QApplication,
+    QHBoxLayout,
+    QLabel,
+    QMainWindow,
+    QPushButton,
+    QStackedWidget,
+    QVBoxLayout,
+    QWidget,
 )
 
 from flagship_converter.core.engine import ConversionEngine

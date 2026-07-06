@@ -38,7 +38,9 @@ _TRANSLATIONS: dict[str, str] = {
     "Добавьте файлы или перетащите их в окно": "Add files or drag them into the window",
     "Открыть папку вывода": "Open output folder",
     "Выберите файлы для конвертации": "Choose files to convert",
-    "Выбранный формат недоступен для этого файла.": "The selected format is not available for this file.",
+    "Выбранный формат недоступен для этого файла.": (
+        "The selected format is not available for this file."
+    ),
     "Нет поддерживаемых файлов для конвертации": "No supported files to convert",
     "Останавливаю текущие задачи…": "Stopping current tasks…",
     "Готово {done}": "Done {done}",

@@ -5,7 +5,12 @@ from pathlib import Path
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QFrame, QLabel, QPushButton, QScrollArea, QVBoxLayout, QWidget,
+    QFrame,
+    QLabel,
+    QPushButton,
+    QScrollArea,
+    QVBoxLayout,
+    QWidget,
 )
 
 from flagship_converter.core.models import JobStatus

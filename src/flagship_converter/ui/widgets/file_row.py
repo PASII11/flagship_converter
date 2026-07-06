@@ -7,8 +7,16 @@ from pathlib import Path
 from PySide6.QtCore import QEasingCurve, QPropertyAnimation, Qt, QUrl, Signal
 from PySide6.QtGui import QDesktopServices
 from PySide6.QtWidgets import (
-    QComboBox, QFrame, QHBoxLayout, QLabel, QProgressBar, QPushButton,
-    QSizePolicy, QSpinBox, QVBoxLayout, QWidget,
+    QComboBox,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QProgressBar,
+    QPushButton,
+    QSizePolicy,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
 )
 
 from flagship_converter.core.models import JobStatus

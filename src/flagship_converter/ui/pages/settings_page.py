@@ -3,8 +3,14 @@ from __future__ import annotations
 
 from PySide6.QtCore import Qt
 from PySide6.QtWidgets import (
-    QComboBox, QFileDialog, QFrame, QHBoxLayout, QLabel, QPushButton,
-    QVBoxLayout, QWidget,
+    QComboBox,
+    QFileDialog,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QPushButton,
+    QVBoxLayout,
+    QWidget,
 )
 
 from flagship_converter.i18n import t

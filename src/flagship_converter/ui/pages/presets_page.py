@@ -5,15 +5,25 @@ import uuid
 
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
-    QComboBox, QFrame, QHBoxLayout, QLabel, QLineEdit, QPushButton,
-    QScrollArea, QSpinBox, QVBoxLayout, QWidget,
+    QComboBox,
+    QFrame,
+    QHBoxLayout,
+    QLabel,
+    QLineEdit,
+    QPushButton,
+    QScrollArea,
+    QSpinBox,
+    QVBoxLayout,
+    QWidget,
 )
 
 from flagship_converter.i18n import t
 from flagship_converter.ui import theme
 from flagship_converter.ui.presets import Preset, PresetStore
 from flagship_converter.ui.video_codecs import (
-    DEFAULT_VIDEO_CODEC, VIDEO_CODEC_IDS, VIDEO_CODEC_LABELS,
+    DEFAULT_VIDEO_CODEC,
+    VIDEO_CODEC_IDS,
+    VIDEO_CODEC_LABELS,
 )
 from flagship_converter.ui.widgets.file_row import OUTPUT_FORMATS
 
