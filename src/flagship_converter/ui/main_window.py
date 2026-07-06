@@ -9,6 +9,7 @@ from PySide6.QtWidgets import (
 )
 
 from flagship_converter.core.engine import ConversionEngine
+from flagship_converter.i18n import set_language, t
 from flagship_converter.ui import theme
 from flagship_converter.ui.pages.converter_page import ConverterPage
 from flagship_converter.ui.pages.presets_page import PresetsPage
@@ -17,6 +18,7 @@ from flagship_converter.ui.presets import PresetStore
 from flagship_converter.ui.settings import AppSettings
 from flagship_converter.ui.widgets.drop_overlay import DropOverlay
 
+_NAV_TITLES = ("Конвертер", "Пресеты", "Настройки")
 _THEME_CYCLE = {"system": "light", "light": "dark", "dark": "system"}
 _THEME_TITLES = {
     "system": "Тема: Системная",
@@ -40,6 +42,7 @@ class MainWindow(QMainWindow):
         self._settings = settings or AppSettings()
         self._store = store or PresetStore()
         self._engine = engine or ConversionEngine(max_workers=self._settings.max_workers or None)
+        set_language(self._settings.language)
         theme.set_theme_mode(self._settings.theme_mode)
 
         self._build_ui()
@@ -74,8 +77,8 @@ class MainWindow(QMainWindow):
         bar.addStretch()
 
         self._nav_buttons: list[QPushButton] = []
-        for index, title in enumerate(("Конвертер", "Пресеты", "Настройки")):
-            btn = QPushButton(title)
+        for index, title in enumerate(_NAV_TITLES):
+            btn = QPushButton(t(title))
             btn.setCursor(Qt.CursorShape.PointingHandCursor)
             btn.setFixedHeight(34)
             btn.clicked.connect(lambda _=False, i=index: self._go(i))
@@ -86,7 +89,7 @@ class MainWindow(QMainWindow):
         self._theme_btn = QPushButton()
         self._theme_btn.setFixedHeight(34)
         self._theme_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._theme_btn.setToolTip("Переключить тему")
+        self._theme_btn.setToolTip(t("Переключить тему"))
         self._theme_btn.clicked.connect(self._cycle_theme)
         bar.addWidget(self._theme_btn)
         col.addWidget(top)
@@ -120,8 +123,10 @@ class MainWindow(QMainWindow):
         self._go(0)
 
     def _on_settings_changed(self) -> None:
+        set_language(self._settings.language)
         theme.set_theme_mode(self._settings.theme_mode)
         self._apply_theme()
+        self._retranslate()
         self._engine.set_max_workers(self._settings.max_workers or None)
 
     def _connect_system_theme_listener(self) -> None:
@@ -148,13 +153,21 @@ class MainWindow(QMainWindow):
         )
         self._brand_title.setStyleSheet(theme.text_style(p.text_primary, 13, 600))
         self._theme_btn.setText(
-            _THEME_TITLES.get(self._settings.theme_mode, "Тема")
+            t(_THEME_TITLES.get(self._settings.theme_mode, "Тема"))
         )
         self._theme_btn.setStyleSheet(theme.secondary_button_qss(p))
         self._style_nav()
         self._converter.apply_theme(p)
         self._presets_page.apply_theme(p)
         self._settings_page.apply_theme(p)
+
+    def _retranslate(self) -> None:
+        for index, btn in enumerate(self._nav_buttons):
+            btn.setText(t(_NAV_TITLES[index]))
+        self._theme_btn.setToolTip(t("Переключить тему"))
+        self._converter.retranslate()
+        self._presets_page.retranslate()
+        self._settings_page.retranslate()
 
     def _style_nav(self) -> None:
         p = theme.palette()
@@ -166,9 +179,9 @@ class MainWindow(QMainWindow):
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:
         if event.mimeData().hasUrls():
             text = (
-                "Дождитесь завершения текущей конвертации"
+                t("Дождитесь завершения текущей конвертации")
                 if self._converter.is_converting
-                else "Отпустите, чтобы добавить файлы"
+                else t("Отпустите, чтобы добавить файлы")
             )
             self._overlay.show_overlay(text)
             event.acceptProposedAction()

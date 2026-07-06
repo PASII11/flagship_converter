@@ -48,3 +48,11 @@ def test_theme_change_via_settings(window):
     assert theme.theme_mode() == theme.ThemeMode.DARK
     window._settings.theme_mode = "light"
     assert theme.theme_mode() == theme.ThemeMode.LIGHT
+
+
+def test_language_change_retranslates_nav(window):
+    window._settings.language = "en"
+    assert window._nav_buttons[0].text() == "Converter"
+    assert window._nav_buttons[2].text() == "Settings"
+    window._settings.language = "ru"
+    assert window._nav_buttons[0].text() == "Конвертер"
