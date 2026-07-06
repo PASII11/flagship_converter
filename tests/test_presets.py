@@ -1,4 +1,5 @@
 """PresetStore: CRUD и JSON-персистентность."""
+import json
 from pathlib import Path
 
 from flagship_converter.ui.presets import BUILTIN_PRESETS, Preset, PresetStore
@@ -51,3 +52,39 @@ def test_corrupt_file_degrades_silently(tmp_path: Path):
     path.write_text("{broken json", encoding="utf-8")
     store = PresetStore(path)
     assert store.presets() == []
+
+
+def test_legacy_video_codec_text_is_migrated_on_load(tmp_path: Path):
+    path = tmp_path / "presets.json"
+    path.write_text(
+        json.dumps({
+            "version": 1,
+            "presets": [{
+                "id": "u1", "name": "Video", "formats": {"video": "mp4"},
+                "image_quality": 85, "audio_bitrate": "192k",
+                "video_bitrate": "2.5M", "video_codec": "NVIDIA (NVENC)",
+            }],
+        }),
+        encoding="utf-8",
+    )
+    store = PresetStore(path)
+    loaded = store.get("u1")
+    assert loaded is not None
+    assert loaded.video_codec == "nvidia"
+
+
+def test_already_migrated_video_codec_id_is_kept(tmp_path: Path):
+    path = tmp_path / "presets.json"
+    path.write_text(
+        json.dumps({
+            "version": 1,
+            "presets": [{
+                "id": "u2", "name": "Video", "formats": {"video": "mp4"},
+                "image_quality": 85, "audio_bitrate": "192k",
+                "video_bitrate": "2.5M", "video_codec": "amd",
+            }],
+        }),
+        encoding="utf-8",
+    )
+    store = PresetStore(path)
+    assert store.get("u2").video_codec == "amd"

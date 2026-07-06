@@ -8,7 +8,9 @@ from pathlib import Path
 
 from PySide6.QtCore import QObject, QStandardPaths, Signal
 
-DEFAULT_CODEC = "Авто (CPU x264)"
+from flagship_converter.ui.video_codecs import DEFAULT_VIDEO_CODEC, migrate_video_codec
+
+DEFAULT_CODEC = DEFAULT_VIDEO_CODEC
 
 
 @dataclass
@@ -92,7 +94,13 @@ class PresetStore(QObject):
         try:
             raw = json.loads(self._path.read_text(encoding="utf-8"))
             self._user = [
-                Preset(**{**item, "builtin": False})
+                Preset(**{
+                    **item,
+                    "builtin": False,
+                    "video_codec": migrate_video_codec(
+                        item.get("video_codec", DEFAULT_CODEC)
+                    ),
+                })
                 for item in raw.get("presets", [])
             ]
         except (OSError, ValueError, TypeError):
