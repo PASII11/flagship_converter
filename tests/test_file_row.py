@@ -85,3 +85,49 @@ def test_unknown_file_not_convertible(app, tmp_path):
     row = FileRow(f)
     assert not row.is_convertible()
     assert row.target_ext == ""
+
+
+def test_job_params_video_codec_is_an_id(app, tmp_path):
+    f = tmp_path / "v.mkv"
+    f.write_bytes(b"x")
+    row = FileRow(f)
+    assert row.job_params["video_codec"] == "auto"
+    row._codec.setCurrentIndex(row._codec.findData("nvidia"))
+    assert row.job_params["video_codec"] == "nvidia"
+
+
+def test_apply_preset_sets_codec_by_id(app, tmp_path):
+    f = tmp_path / "v.mkv"
+    f.write_bytes(b"x")
+    row = FileRow(f)
+    preset = Preset(
+        id="v1", name="Video", builtin=False,
+        formats={"video": "mp4"}, video_codec="intel",
+    )
+    row.apply_preset(preset)
+    assert row.job_params["video_codec"] == "intel"
+
+
+def test_retranslate_updates_labels_and_error(app, tmp_path):
+    from flagship_converter import i18n
+
+    f = tmp_path / "a.jpg"
+    f.write_bytes(b"x")
+    row = FileRow(f)
+    row.set_error("disk full")
+    i18n.set_language("en")
+    row.retranslate()
+    assert row._preset_label.text() == "Preset"
+    assert row._quality_label.text() == "Quality"
+    assert row._error_label.text() == "Conversion failed: disk full"
+
+
+def test_construct_time_translation(app, tmp_path):
+    from flagship_converter import i18n
+
+    i18n.set_language("en")
+    f = tmp_path / "a.jpg"
+    f.write_bytes(b"x")
+    row = FileRow(f)
+    assert row._preset_label.text() == "Preset"
+    assert "Image" in row._meta.text()

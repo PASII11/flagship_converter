@@ -12,8 +12,10 @@ from PySide6.QtWidgets import (
 )
 
 from flagship_converter.core.models import JobStatus
+from flagship_converter.i18n import t
 from flagship_converter.ui import theme
 from flagship_converter.ui.presets import Preset
+from flagship_converter.ui.video_codecs import VIDEO_CODEC_IDS, VIDEO_CODEC_LABELS
 
 IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif", ".gif"}
 AUDIO_EXTS = {".mp3", ".wav", ".flac", ".aac", ".m4a", ".ogg", ".wma"}
@@ -88,7 +90,9 @@ class FileRow(QFrame):
         if default_video_codec:
             self._applying = True
             try:
-                self._codec.setCurrentText(default_video_codec)
+                self._codec.setCurrentIndex(
+                    max(0, self._codec.findData(default_video_codec))
+                )
             finally:
                 self._applying = False
         self.apply_theme()
@@ -119,7 +123,8 @@ class FileRow(QFrame):
             size = _fmt_size(self.file_path.stat().st_size)
         except OSError:
             size = "—"
-        self._meta = QLabel(f"{CATEGORY_TITLES[self.category]} · {size}")
+        self._size_text = size
+        self._meta = QLabel(f"{t(CATEGORY_TITLES[self.category])} · {size}")
 
         self._format_box = QComboBox()
         self._format_box.addItems(OUTPUT_FORMATS.get(self.category, []))
@@ -145,7 +150,7 @@ class FileRow(QFrame):
         self._remove_btn = QPushButton("×")
         self._remove_btn.setFixedSize(28, 28)
         self._remove_btn.setCursor(Qt.CursorShape.PointingHandCursor)
-        self._remove_btn.setToolTip("Убрать файл из очереди")
+        self._remove_btn.setToolTip(t("Убрать файл из очереди"))
         self._remove_btn.clicked.connect(
             lambda: self.remove_requested.emit(self.card_id)
         )
@@ -171,10 +176,10 @@ class FileRow(QFrame):
 
         preset_row = QHBoxLayout()
         preset_row.setSpacing(theme.SPACING["sm"])
-        self._preset_label = QLabel("Пресет")
+        self._preset_label = QLabel(t("Пресет"))
         self._preset_box = QComboBox()
         self._preset_box.setMinimumWidth(160)
-        self._preset_box.addItem("Свои настройки", "")
+        self._preset_box.addItem(t("Свои настройки"), "")
         self._preset_box.currentIndexChanged.connect(self._on_preset_chosen)
         preset_row.addWidget(self._preset_label)
         preset_row.addWidget(self._preset_box)
@@ -183,27 +188,26 @@ class FileRow(QFrame):
 
         params = QHBoxLayout()
         params.setSpacing(theme.SPACING["sm"])
-        self._quality_label = QLabel("Качество")
+        self._quality_label = QLabel(t("Качество"))
         self._quality = QSpinBox()
         self._quality.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
         self._quality.setRange(1, 95)
         self._quality.setValue(85)
         self._quality.valueChanged.connect(self._mark_override)
-        self._abitrate_label = QLabel("Битрейт аудио")
+        self._abitrate_label = QLabel(t("Битрейт аудио"))
         self._abitrate = QComboBox()
         self._abitrate.addItems(["128k", "192k", "256k", "320k"])
         self._abitrate.setCurrentText("192k")
         self._abitrate.currentTextChanged.connect(self._mark_override)
-        self._vbitrate_label = QLabel("Битрейт видео")
+        self._vbitrate_label = QLabel(t("Битрейт видео"))
         self._vbitrate = QComboBox()
         self._vbitrate.addItems(["1M", "2.5M", "5M", "10M", "20M"])
         self._vbitrate.setCurrentText("2.5M")
         self._vbitrate.currentTextChanged.connect(self._mark_override)
-        self._codec_label = QLabel("Кодек")
+        self._codec_label = QLabel(t("Кодек"))
         self._codec = QComboBox()
-        self._codec.addItems(
-            ["Авто (CPU x264)", "AMD (AMF)", "NVIDIA (NVENC)", "Intel (QSV)"]
-        )
+        for codec_id in VIDEO_CODEC_IDS:
+            self._codec.addItem(t(VIDEO_CODEC_LABELS[codec_id]), codec_id)
         self._codec.currentTextChanged.connect(self._mark_override)
         for w in (
             self._quality_label, self._quality,
@@ -212,7 +216,7 @@ class FileRow(QFrame):
             self._codec_label, self._codec,
         ):
             params.addWidget(w)
-        self._reset_btn = QPushButton("Сбросить к пресету")
+        self._reset_btn = QPushButton(t("Сбросить к пресету"))
         self._reset_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._reset_btn.clicked.connect(self.reset_override)
         params.addWidget(self._reset_btn)
@@ -222,7 +226,7 @@ class FileRow(QFrame):
         self._error_label = QLabel()
         self._error_label.setWordWrap(True)
         self._error_label.setVisible(False)
-        self._copy_btn = QPushButton("Копировать текст ошибки")
+        self._copy_btn = QPushButton(t("Копировать текст ошибки"))
         self._copy_btn.setVisible(False)
         self._copy_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._copy_btn.clicked.connect(self._copy_error)
@@ -233,10 +237,10 @@ class FileRow(QFrame):
         result.setSpacing(theme.SPACING["sm"])
         self._result_label = QLabel()
         self._result_label.setVisible(False)
-        self._open_btn = QPushButton("Открыть")
+        self._open_btn = QPushButton(t("Открыть"))
         self._open_btn.setVisible(False)
         self._open_btn.clicked.connect(self._open_file)
-        self._folder_btn = QPushButton("Папка")
+        self._folder_btn = QPushButton(t("Папка"))
         self._folder_btn.setVisible(False)
         self._folder_btn.clicked.connect(self._open_folder)
         result.addWidget(self._result_label, stretch=1)
@@ -299,7 +303,7 @@ class FileRow(QFrame):
             self._quality.setValue(preset.image_quality)
             self._abitrate.setCurrentText(preset.audio_bitrate)
             self._vbitrate.setCurrentText(preset.video_bitrate)
-            self._codec.setCurrentText(preset.video_codec)
+            self._codec.setCurrentIndex(max(0, self._codec.findData(preset.video_codec)))
         finally:
             self._applying = False
 
@@ -310,7 +314,7 @@ class FileRow(QFrame):
         current = str(self._preset_box.currentData() or "")
         self._preset_box.blockSignals(True)
         self._preset_box.clear()
-        self._preset_box.addItem("Свои настройки", "")
+        self._preset_box.addItem(t("Свои настройки"), "")
         for preset in self._presets:
             self._preset_box.addItem(preset.name, preset.id)
         self._preset_box.setCurrentIndex(
@@ -354,7 +358,7 @@ class FileRow(QFrame):
             "lossless_webp": False,
             "audio_bitrate": self._abitrate.currentText(),
             "video_bitrate": self._vbitrate.currentText(),
-            "video_codec": self._codec.currentText(),
+            "video_codec": self._codec.currentData(),
         }
 
     def is_convertible(self) -> bool:
@@ -382,7 +386,7 @@ class FileRow(QFrame):
     def set_error(self, error: str) -> None:
         self._status = JobStatus.FAILED
         self._last_error = error
-        self._error_label.setText(f"Не удалось конвертировать: {error}")
+        self._error_label.setText(t("Не удалось конвертировать: {error}").format(error=error))
         self._error_label.setVisible(True)
         self._copy_btn.setVisible(True)
         self.set_expanded(True)
@@ -407,6 +411,26 @@ class FileRow(QFrame):
             w.setEnabled(enabled)
         self._remove_btn.setEnabled(not locked)
 
+
+    def retranslate(self) -> None:
+        self._meta.setText(f"{t(CATEGORY_TITLES[self.category])} · {self._size_text}")
+        self._remove_btn.setToolTip(t("Убрать файл из очереди"))
+        self._preset_label.setText(t("Пресет"))
+        self._preset_box.setItemText(0, t("Свои настройки"))
+        self._quality_label.setText(t("Качество"))
+        self._abitrate_label.setText(t("Битрейт аудио"))
+        self._vbitrate_label.setText(t("Битрейт видео"))
+        self._codec_label.setText(t("Кодек"))
+        for i, codec_id in enumerate(VIDEO_CODEC_IDS):
+            self._codec.setItemText(i, t(VIDEO_CODEC_LABELS[codec_id]))
+        self._reset_btn.setText(t("Сбросить к пресету"))
+        self._copy_btn.setText(t("Копировать текст ошибки"))
+        self._open_btn.setText(t("Открыть"))
+        self._folder_btn.setText(t("Папка"))
+        if self._last_error:
+            self._error_label.setText(
+                t("Не удалось конвертировать: {error}").format(error=self._last_error)
+            )
 
     def apply_theme(self, p: theme.Palette | None = None) -> None:
         p = p or theme.palette()
