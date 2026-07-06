@@ -352,3 +352,41 @@ def test_docx_to_pdf_uses_html_fallback_with_images(monkeypatch, tmp_path) -> No
     assert pdf_path.exists()
     assert "Document with embedded image" in captured_html["html"]
     assert "data:image/png;base64," in captured_html["html"]
+
+
+def test_video_converter_maps_amd_codec_id(monkeypatch) -> None:
+    from flagship_converter.core.converters import video
+
+    captured: dict[str, list[str]] = {}
+
+    def fake_run_ffmpeg(cmd, cancel_cb, progress_cb=None):
+        captured["cmd"] = cmd
+
+    monkeypatch.setattr(video, "run_ffmpeg", fake_run_ffmpeg)
+    monkeypatch.setattr(video, "get_ffmpeg_path", lambda: "ffmpeg")
+
+    video.VideoConverter().convert(
+        Path("in.mp4"), Path("out.mp4"),
+        {"video_bitrate": "2.5M", "video_codec": "amd"},
+        cancel_cb=lambda: False,
+    )
+    assert "h264_amf" in captured["cmd"]
+
+
+def test_video_converter_defaults_to_libx264_for_auto_codec(monkeypatch) -> None:
+    from flagship_converter.core.converters import video
+
+    captured: dict[str, list[str]] = {}
+
+    def fake_run_ffmpeg(cmd, cancel_cb, progress_cb=None):
+        captured["cmd"] = cmd
+
+    monkeypatch.setattr(video, "run_ffmpeg", fake_run_ffmpeg)
+    monkeypatch.setattr(video, "get_ffmpeg_path", lambda: "ffmpeg")
+
+    video.VideoConverter().convert(
+        Path("in.mp4"), Path("out.mp4"),
+        {"video_bitrate": "2.5M", "video_codec": "auto"},
+        cancel_cb=lambda: False,
+    )
+    assert "libx264" in captured["cmd"]

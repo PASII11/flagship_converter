@@ -42,18 +42,18 @@ class VideoConverter:
 
         target_ext = output_path.suffix.lower().lstrip(".")
         video_bitrate = str(params.get("video_bitrate", "2.5M"))
-        codec_str = str(params.get("video_codec", "CPU (x264)"))
+        codec_id = str(params.get("video_codec", "auto"))
 
         cmd = [get_ffmpeg_path(), "-y", "-i", str(input_path)]
 
         if target_ext == "webm":
             cmd.extend(["-c:v", "libvpx-vp9", "-b:v", video_bitrate, "-c:a", "libopus"])
         else:
-            if "AMD" in codec_str:
+            if codec_id == "amd":
                 vcodec = "h264_amf"
-            elif "NVIDIA" in codec_str:
+            elif codec_id == "nvidia":
                 vcodec = "h264_nvenc"
-            elif "Intel" in codec_str:
+            elif codec_id == "intel":
                 vcodec = "h264_qsv"
             else:
                 vcodec = "libx264"
