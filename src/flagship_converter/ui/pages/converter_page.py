@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
 
 from flagship_converter.core.engine import ConversionEngine
 from flagship_converter.core.models import ConversionPlan, JobStatus
+from flagship_converter.i18n import t
 from flagship_converter.ui import theme
 from flagship_converter.ui.presets import PresetStore
 from flagship_converter.ui.settings import AppSettings
@@ -73,13 +74,13 @@ class ConverterPage(QWidget):
         f = QHBoxLayout(footer)
         f.setContentsMargins(theme.SPACING["xs"], 0, theme.SPACING["xs"], 0)
         f.setSpacing(theme.SPACING["md"])
-        self._footer_label = QLabel("Добавьте файлы или перетащите их в окно")
+        self._footer_label = QLabel(t("Добавьте файлы или перетащите их в окно"))
         self._overall = QProgressBar()
         self._overall.setRange(0, 100)
         self._overall.setTextVisible(False)
         self._overall.setFixedHeight(4)
         self._percent_label = QLabel("")
-        self._open_folder_btn = QPushButton("Открыть папку вывода")
+        self._open_folder_btn = QPushButton(t("Открыть папку вывода"))
         self._open_folder_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._open_folder_btn.setVisible(False)
         self._open_folder_btn.clicked.connect(self._open_output_folder)
@@ -109,14 +110,14 @@ class ConverterPage(QWidget):
         if self._converting:
             return
         paths, _ = QFileDialog.getOpenFileNames(
-            self, "Выберите файлы для конвертации"
+            self, t("Выберите файлы для конвертации")
         )
         if paths:
             self.add_files(paths)
 
     def _pick_folder(self) -> None:
         folder = QFileDialog.getExistingDirectory(
-            self, "Выберите папку для сохранения"
+            self, t("Выберите папку для сохранения")
         )
         if folder:
             self._settings.output_mode = "fixed"
@@ -127,7 +128,7 @@ class ConverterPage(QWidget):
         if self._settings.output_mode == "fixed" and self._settings.fixed_output_dir:
             self._command_bar.set_folder_text(self._settings.fixed_output_dir)
         else:
-            self._command_bar.set_folder_text("converted/ рядом с исходником")
+            self._command_bar.set_folder_text(t("converted/ рядом с исходником"))
 
     def _output_dir_for(self, row_path: Path) -> Path:
         if self._settings.output_mode == "fixed" and self._settings.fixed_output_dir:
@@ -145,7 +146,7 @@ class ConverterPage(QWidget):
         )
         if self._queue.count() == 0:
             self._footer_label.setText(
-                "Добавьте файлы или перетащите их в окно"
+                t("Добавьте файлы или перетащите их в окно")
             )
             self._overall.setValue(0)
             self._percent_label.setText("")
@@ -178,9 +179,9 @@ class ConverterPage(QWidget):
                 row.set_status(JobStatus.PENDING)
                 row.set_progress(0)
             else:
-                row.set_error("Выбранный формат недоступен для этого файла.")
+                row.set_error(t("Выбранный формат недоступен для этого файла."))
         if not plan.jobs:
-            self._footer_label.setText("Нет поддерживаемых файлов для конвертации")
+            self._footer_label.setText(t("Нет поддерживаемых файлов для конвертации"))
             return
 
         self._cancel_event = threading.Event()
@@ -198,7 +199,7 @@ class ConverterPage(QWidget):
     def _cancel_conversion(self) -> None:
         if self._cancel_event:
             self._cancel_event.set()
-        self._footer_label.setText("Останавливаю текущие задачи…")
+        self._footer_label.setText(t("Останавливаю текущие задачи…"))
 
     def _set_converting(self, converting: bool) -> None:
         self._converting = converting
@@ -259,11 +260,11 @@ class ConverterPage(QWidget):
         done = sum(1 for s in statuses if s == JobStatus.DONE)
         failed = sum(1 for s in statuses if s == JobStatus.FAILED)
         cancelled = sum(1 for s in statuses if s == JobStatus.CANCELLED)
-        parts = [f"Готово {done}"]
+        parts = [t("Готово {done}").format(done=done)]
         if failed:
-            parts.append(f"Ошибки {failed}")
+            parts.append(t("Ошибки {failed}").format(failed=failed))
         if cancelled:
-            parts.append(f"Отменено {cancelled}")
+            parts.append(t("Отменено {cancelled}").format(cancelled=cancelled))
         self._footer_label.setText(" · ".join(parts))
         if statuses:
             self._overall.setValue(100)
@@ -290,7 +291,9 @@ class ConverterPage(QWidget):
             if (r := self._queue.get_row(card_id))
             and r.status == JobStatus.DONE
         )
-        self._footer_label.setText(f"Готово {done} · В работе {running}")
+        self._footer_label.setText(
+            t("Готово {done} · В работе {running}").format(done=done, running=running)
+        )
 
     def _open_output_folder(self) -> None:
         for card_id in self._job_row_map.values():
@@ -301,6 +304,11 @@ class ConverterPage(QWidget):
                 )
                 return
 
+    def retranslate(self) -> None:
+        self._command_bar.retranslate()
+        self._queue.retranslate()
+        self._sync_folder_text()
+        self._sync_controls()
 
     def apply_theme(self, p: theme.Palette | None = None) -> None:
         p = p or theme.palette()

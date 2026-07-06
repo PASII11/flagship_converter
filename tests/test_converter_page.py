@@ -77,3 +77,25 @@ def test_folder_chip_follows_settings(page):
     page._settings.output_mode = "fixed"
     page._settings.fixed_output_dir = "C:/out"
     assert page._command_bar._folder_btn.text() == "C:/out"
+
+
+def test_construct_time_translation(app, tmp_path):
+    from flagship_converter import i18n
+
+    QCoreApplication.setOrganizationName("FlagshipTest")
+    qs = QSettings("FlagshipTest", "ConverterPageEnTests")
+    qs.clear()
+    i18n.set_language("en")
+    page = ConverterPage(
+        ConversionEngine(), AppSettings(qs), PresetStore(tmp_path / "presets.json"),
+    )
+    assert page._footer_label.text() == "Add files or drag them into the window"
+
+
+def test_retranslate_updates_footer_and_children(page):
+    from flagship_converter import i18n
+
+    i18n.set_language("en")
+    page.retranslate()
+    assert page._command_bar._add_btn.text() == "Add files"
+    assert page._footer_label.text() == "Add files or drag them into the window"
