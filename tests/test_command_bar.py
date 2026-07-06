@@ -27,3 +27,24 @@ def test_converting_mode(app):
     bar.set_converting(False)
     assert bar._convert_btn.isVisibleTo(bar)
     assert bar._add_btn.isEnabled()
+
+
+def test_retranslate_updates_all_text(app):
+    from flagship_converter import i18n
+
+    bar = CommandBar()
+    bar.set_convert_count(3)
+    i18n.set_language("en")
+    bar.retranslate()
+    assert bar._add_btn.text() == "Add files"
+    assert bar._convert_btn.text() == "Convert 3"
+    assert bar._cancel_btn.text() == "Cancel"
+
+
+def test_construct_time_translation(app):
+    from flagship_converter import i18n
+
+    i18n.set_language("en")
+    bar = CommandBar()
+    assert bar._add_btn.text() == "Add files"
+    assert bar._convert_btn.text() == "Convert"
