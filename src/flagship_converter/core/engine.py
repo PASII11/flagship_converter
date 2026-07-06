@@ -13,6 +13,7 @@ from flagship_converter.core.converters.document import DocConverter
 from flagship_converter.core.converters.image import ImageConverter
 from flagship_converter.core.converters.video import VideoConverter
 from flagship_converter.core.models import ConversionJob, ConversionPlan, JobStatus
+from flagship_converter.i18n import t
 
 
 class ConversionEngine:
@@ -221,7 +222,7 @@ class ConversionEngine:
             if not converter:
                 for j in jobs:
                     j.status = JobStatus.FAILED
-                    j.error = f"Конвертер '{conv_name}' не найден"
+                    j.error = t("Конвертер '{name}' не найден").format(name=conv_name)
                     on_job_failed(j.id, j.error)
                 continue
 

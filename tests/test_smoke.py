@@ -390,3 +390,66 @@ def test_video_converter_defaults_to_libx264_for_auto_codec(monkeypatch) -> None
         cancel_cb=lambda: False,
     )
     assert "libx264" in captured["cmd"]
+
+
+def test_engine_reports_translated_error_for_missing_converter() -> None:
+    from flagship_converter import i18n
+    from flagship_converter.core.engine import ConversionEngine
+    from flagship_converter.core.models import ConversionJob, ConversionPlan
+
+    with tempfile.TemporaryDirectory() as tmp:
+        root = Path(tmp)
+        src = root / "input.in"
+        src.touch()
+        job = ConversionJob(src, root / "out.out", "GhostConverter", {}, "out", overwrite=False)
+
+        engine = ConversionEngine()
+        engine._converters = []  # type: ignore[attr-defined]
+
+        failed: list[tuple[str, str]] = []
+        i18n.set_language("en")
+        engine.execute_plan(
+            ConversionPlan([job]),
+            cancel_cb=lambda: False,
+            on_job_started=lambda _job_id: None,
+            on_job_finished=lambda _job_id: pytest.fail("should not finish"),
+            on_job_failed=lambda job_id, error: failed.append((job_id, error)),
+        )
+
+        assert failed == [(job.id, "Converter 'GhostConverter' not found")]
+
+
+def test_image_converter_reports_translated_error_for_corrupt_file(tmp_path: Path) -> None:
+    from flagship_converter import i18n
+    from flagship_converter.core.converters.image import ImageConverter
+
+    src = tmp_path / "broken.png"
+    src.write_bytes(b"not an image")
+    out = tmp_path / "out.jpg"
+
+    i18n.set_language("en")
+    with pytest.raises(RuntimeError, match="Failed to open image: broken.png"):
+        ImageConverter().convert(src, out, {"quality": 85}, cancel_cb=lambda: False)
+
+
+def test_run_ffmpeg_reports_translated_error_when_stderr_missing(monkeypatch) -> None:
+    from flagship_converter import i18n
+    from flagship_converter.core.converters import media
+
+    class FakeProcess:
+        def __init__(self) -> None:
+            self.stderr = None
+            self.returncode = None
+
+        def terminate(self) -> None:
+            pass
+
+        def wait(self, timeout=None):
+            self.returncode = 0
+            return self.returncode
+
+    monkeypatch.setattr(media.subprocess, "Popen", lambda *args, **kwargs: FakeProcess())
+
+    i18n.set_language("en")
+    with pytest.raises(RuntimeError, match="Failed to open FFmpeg process stderr"):
+        media.run_ffmpeg(["ffmpeg", "-version"], cancel_cb=lambda: False)

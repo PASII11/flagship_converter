@@ -8,6 +8,7 @@ from pathlib import Path
 from PIL import Image, UnidentifiedImageError
 
 from flagship_converter.core.converters.base import safe_output_path
+from flagship_converter.i18n import t
 
 SUPPORTED_INPUT = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif", ".gif"}
 SUPPORTED_OUTPUT = {"png", "jpg", "jpeg", "webp", "bmp", "tiff"}
@@ -93,6 +94,12 @@ class ImageConverter:
                     progress_cb(100)
 
         except UnidentifiedImageError as e:
-            raise RuntimeError(f"Не удалось открыть изображение: {input_path.name}") from e
+            raise RuntimeError(
+                t("Не удалось открыть изображение: {name}").format(name=input_path.name)
+            ) from e
         except OSError as e:
-            raise RuntimeError(f"Ошибка при сохранении {output_path.name}: {e}") from e
+            raise RuntimeError(
+                t("Ошибка при сохранении {name}: {error}").format(
+                    name=output_path.name, error=e
+                )
+            ) from e

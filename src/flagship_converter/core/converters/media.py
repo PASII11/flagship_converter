@@ -11,6 +11,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from flagship_converter.core.converters.base import ConversionCancelled
+from flagship_converter.i18n import t
 
 DURATION_RE = re.compile(r"Duration:\s*(?P<hours>\d+):(?P<minutes>\d+):(?P<seconds>\d+\.\d+)")
 TIME_RE = re.compile(r"time=(?P<hours>\d+):(?P<minutes>\d+):(?P<seconds>\d+\.\d+)")
@@ -112,11 +113,11 @@ def run_ffmpeg(
 
     if not process.stderr:
         _terminate_process(process)
-        raise RuntimeError("Не удалось открыть stderr процесса FFmpeg")
+        raise RuntimeError(t("Не удалось открыть stderr процесса FFmpeg"))
 
     q: queue.Queue[str] = queue.Queue()
-    t = threading.Thread(target=_enqueue_output, args=(process.stderr, q), daemon=True)
-    t.start()
+    output_thread = threading.Thread(target=_enqueue_output, args=(process.stderr, q), daemon=True)
+    output_thread.start()
 
     error_log: list[str] = []
     total_seconds = 0.0
@@ -124,7 +125,7 @@ def run_ffmpeg(
     while True:
         if cancel_cb():
             _terminate_process(process)
-            t.join(timeout=1.0)
+            output_thread.join(timeout=1.0)
             raise ConversionCancelled()
 
         try:
@@ -163,7 +164,7 @@ def run_ffmpeg(
                     progress_cb(percent)
 
     process.wait()
-    t.join(timeout=1.0)
+    output_thread.join(timeout=1.0)
 
     if process.returncode != 0 and not cancel_cb():
         err_str = "\n".join(error_log)
