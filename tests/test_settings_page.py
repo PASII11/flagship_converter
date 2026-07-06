@@ -47,3 +47,29 @@ def test_pages_stay_in_sync_via_settings_changed(app, settings):
     page_b = SettingsPage(settings)
     page_a._theme_box.setCurrentIndex(page_a._theme_box.findData("dark"))
     assert page_b._theme_box.currentData() == "dark"
+
+
+def test_language_box_reflects_and_updates_settings(app, settings):
+    settings.language = "en"
+    page = SettingsPage(settings)
+    assert page._language_box.currentData() == "en"
+    page._language_box.setCurrentIndex(page._language_box.findData("ru"))
+    assert settings.language == "ru"
+
+
+def test_codec_box_uses_ids(app, settings):
+    page = SettingsPage(settings)
+    assert page._codec_box.currentData() == "auto"
+    page._codec_box.setCurrentIndex(page._codec_box.findData("intel"))
+    assert settings.default_video_codec == "intel"
+
+
+def test_retranslate_updates_labels(app, settings):
+    from flagship_converter import i18n
+
+    page = SettingsPage(settings)
+    i18n.set_language("en")
+    page.retranslate()
+    assert page._title.text() == "Settings"
+    assert page._language_label.text() == "Language"
+    assert page._codec_box.itemText(0) == "Auto (CPU x264)"
