@@ -1,9 +1,15 @@
 """Настройки приложения поверх QSettings."""
 from __future__ import annotations
 
-from PySide6.QtCore import QObject, QSettings, Signal
+from PySide6.QtCore import QLocale, QObject, QSettings, Signal
 
-DEFAULT_CODEC = "Авто (CPU x264)"
+from flagship_converter.ui.video_codecs import DEFAULT_VIDEO_CODEC, migrate_video_codec
+
+DEFAULT_CODEC = DEFAULT_VIDEO_CODEC
+
+
+def detect_system_language() -> str:
+    return "ru" if QLocale.system().name().startswith("ru") else "en"
 
 
 class AppSettings(QObject):
@@ -12,11 +18,23 @@ class AppSettings(QObject):
     def __init__(self, qsettings: QSettings | None = None) -> None:
         super().__init__()
         self._s = qsettings or QSettings("Flagship", "FlagshipConverter")
+        if not self._s.contains("language"):
+            self._s.setValue("language", detect_system_language())
+            self._s.sync()
 
     def _set(self, key: str, value: object) -> None:
         self._s.setValue(key, value)
         self._s.sync()
         self.changed.emit()
+
+    @property
+    def language(self) -> str:
+        value = str(self._s.value("language", "ru"))
+        return value if value in ("ru", "en") else "ru"
+
+    @language.setter
+    def language(self, value: str) -> None:
+        self._set("language", value)
 
     @property
     def theme_mode(self) -> str:
@@ -60,7 +78,8 @@ class AppSettings(QObject):
 
     @property
     def default_video_codec(self) -> str:
-        return str(self._s.value("default_video_codec", DEFAULT_CODEC))
+        raw = str(self._s.value("default_video_codec", DEFAULT_CODEC))
+        return migrate_video_codec(raw)
 
     @default_video_codec.setter
     def default_video_codec(self, value: str) -> None:

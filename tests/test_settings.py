@@ -18,7 +18,8 @@ def test_defaults():
     assert s.fixed_output_dir == ""
     assert s.overwrite is False
     assert s.max_workers == 0
-    assert s.default_video_codec == "Авто (CPU x264)"
+    assert s.default_video_codec == "auto"
+    assert s.language in ("ru", "en")
 
 
 def test_roundtrip_persists_between_instances():
@@ -44,3 +45,27 @@ def test_changed_signal_emitted():
     s.changed.connect(lambda: hits.append(True))
     s.theme_mode = "light"
     assert hits
+
+
+def test_language_persists_between_instances():
+    qs = _mem_settings()
+    s = AppSettings(qs)
+    s.language = "en"
+
+    s2 = AppSettings(QSettings("FlagshipTest", "UnitTests"))
+    assert s2.language == "en"
+
+
+def test_language_defaults_via_system_locale(monkeypatch):
+    from flagship_converter.ui import settings as settings_module
+
+    monkeypatch.setattr(settings_module, "detect_system_language", lambda: "en")
+    s = AppSettings(_mem_settings())
+    assert s.language == "en"
+
+
+def test_legacy_default_video_codec_text_is_migrated():
+    qs = _mem_settings()
+    qs.setValue("default_video_codec", "NVIDIA (NVENC)")
+    s = AppSettings(qs)
+    assert s.default_video_codec == "nvidia"
