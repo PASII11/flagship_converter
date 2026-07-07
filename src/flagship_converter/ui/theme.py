@@ -177,7 +177,9 @@ QWidget#Root {{
 """
 
 
-def panel_qss(object_name: str = "Panel", p: Palette | None = None, radius: int | None = None) -> str:
+def panel_qss(
+    object_name: str = "Panel", p: Palette | None = None, radius: int | None = None
+) -> str:
     p = p or palette()
     if radius is None:
         radius = RADIUS["panel"]

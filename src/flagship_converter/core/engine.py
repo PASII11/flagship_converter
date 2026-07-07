@@ -235,7 +235,10 @@ class ConversionEngine:
             else:
                 workers = 1
 
-            with concurrent.futures.ThreadPoolExecutor(max_workers=self._effective_workers(workers)) as pool:
+            effective_workers = self._effective_workers(workers)
+            with concurrent.futures.ThreadPoolExecutor(
+                max_workers=effective_workers
+            ) as pool:
                 futures = [pool.submit(_process_job, job, converter) for job in jobs]
 
                 for future in concurrent.futures.as_completed(futures):
