@@ -135,3 +135,45 @@ def docling_document_to_docx(dl_doc: DoclingDocument, output_path: Path) -> None
 
     output_path.parent.mkdir(parents=True, exist_ok=True)
     doc.save(str(output_path))
+
+
+def extract_text_paragraphs(input_path: Path) -> list[str]:
+    """Аварийный путь: сырой текст PDF со склейкой перенесённых строк в абзацы."""
+    import pypdfium2 as pdfium
+
+    lines: list[str] = []
+    pdf = pdfium.PdfDocument(str(input_path))
+    try:
+        for index in range(len(pdf)):
+            page = pdf[index]
+            try:
+                textpage = page.get_textpage()
+                try:
+                    text = textpage.get_text_range()
+                finally:
+                    textpage.close()
+            finally:
+                page.close()
+            lines.extend(text.splitlines())
+            lines.append("")
+    finally:
+        pdf.close()
+
+    paragraphs: list[str] = []
+    current: list[str] = []
+    for line in lines:
+        stripped = line.strip()
+        if stripped:
+            current.append(stripped)
+        elif current:
+            paragraphs.append(" ".join(current))
+            current = []
+    if current:
+        paragraphs.append(" ".join(current))
+
+    if not paragraphs:
+        raise RuntimeError(
+            "PDF contains no extractable text. Bundle Docling offline models to process "
+            "scanned PDFs or image-only documents."
+        )
+    return paragraphs

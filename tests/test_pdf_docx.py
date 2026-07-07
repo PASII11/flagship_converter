@@ -144,3 +144,32 @@ def test_docling_document_to_docx_rejects_empty_document(tmp_path: Path) -> None
 
     with pytest.raises(RuntimeError, match="no renderable content"):
         docling_document_to_docx(DoclingDocument(name="empty"), tmp_path / "empty.docx")
+
+
+def test_extract_text_paragraphs_merges_wrapped_lines(tmp_path: Path) -> None:
+    from flagship_converter.core.converters.pdf_docx import extract_text_paragraphs
+
+    pdf = tmp_path / "wrapped.pdf"
+    _make_digital_pdf(
+        pdf,
+        paragraphs=[
+            "First line of a paragraph that",
+            "continues on the second line",
+            "and ends on the third one.",
+        ],
+    )
+
+    paragraphs = extract_text_paragraphs(pdf)
+
+    assert len(paragraphs) == 1
+    assert "that continues on the second line and ends" in paragraphs[0]
+
+
+def test_extract_text_paragraphs_raises_for_image_only(tmp_path: Path) -> None:
+    from flagship_converter.core.converters.pdf_docx import extract_text_paragraphs
+
+    pdf = tmp_path / "scan.pdf"
+    _make_image_only_pdf(pdf)
+
+    with pytest.raises(RuntimeError, match="no extractable text"):
+        extract_text_paragraphs(pdf)
