@@ -11,9 +11,3 @@ wheels/
 
 # IDE
 .idea/
-
-# SDD scratch
-.superpowers/
-
-# Claude Code local settings
-.claude/
