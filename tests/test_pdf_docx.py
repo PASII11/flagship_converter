@@ -6,6 +6,7 @@ import io
 import zipfile
 from pathlib import Path
 
+import pytest
 from PIL import Image
 
 
@@ -86,3 +87,60 @@ def test_convert_with_pdf2docx_preserves_text_and_images(tmp_path: Path) -> None
     assert "digital document" in text
     media = [n for n in zipfile.ZipFile(out).namelist() if n.startswith("word/media/")]
     assert media, "embedded PDF image must survive conversion"
+
+
+def test_docling_document_to_docx_renders_structure(tmp_path: Path) -> None:
+    from docling_core.types.doc import DocItemLabel, DoclingDocument
+    from docling_core.types.doc.document import ImageRef, TableCell, TableData
+    from docx import Document
+
+    from flagship_converter.core.converters.pdf_docx import docling_document_to_docx
+
+    dl_doc = DoclingDocument(name="sample")
+    dl_doc.add_heading("Section title", level=1)
+    dl_doc.add_text(label=DocItemLabel.PARAGRAPH, text="First paragraph")
+    dl_doc.add_list_item("Bullet one")
+    cells = [
+        TableCell(
+            text="A1",
+            start_row_offset_idx=0,
+            end_row_offset_idx=1,
+            start_col_offset_idx=0,
+            end_col_offset_idx=1,
+        ),
+        TableCell(
+            text="B1",
+            start_row_offset_idx=0,
+            end_row_offset_idx=1,
+            start_col_offset_idx=1,
+            end_col_offset_idx=2,
+        ),
+    ]
+    dl_doc.add_table(data=TableData(table_cells=cells, num_rows=1, num_cols=2))
+    dl_doc.add_picture(
+        image=ImageRef.from_pil(Image.new("RGB", (16, 16), (255, 0, 0)), dpi=72)
+    )
+
+    out = tmp_path / "rendered.docx"
+    docling_document_to_docx(dl_doc, out)
+
+    rendered = Document(str(out))
+    styles = [p.style.name for p in rendered.paragraphs]
+    texts = [p.text for p in rendered.paragraphs]
+    assert any(name.startswith("Heading") for name in styles)
+    assert "First paragraph" in texts
+    assert "List Bullet" in styles
+    assert rendered.tables
+    assert rendered.tables[0].rows[0].cells[0].text == "A1"
+    assert rendered.tables[0].rows[0].cells[1].text == "B1"
+    media = [n for n in zipfile.ZipFile(out).namelist() if n.startswith("word/media/")]
+    assert media, "picture must be embedded in the DOCX"
+
+
+def test_docling_document_to_docx_rejects_empty_document(tmp_path: Path) -> None:
+    from docling_core.types.doc import DoclingDocument
+
+    from flagship_converter.core.converters.pdf_docx import docling_document_to_docx
+
+    with pytest.raises(RuntimeError, match="no renderable content"):
+        docling_document_to_docx(DoclingDocument(name="empty"), tmp_path / "empty.docx")
