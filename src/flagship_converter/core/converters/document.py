@@ -15,7 +15,6 @@ from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
-import huggingface_hub.file_download as _hf_fd
 import markdown
 import pdfkit
 from docx import Document
@@ -23,13 +22,6 @@ from docx.document import Document as DocxDocument
 from docx.oxml.ns import qn
 from docx.table import Table
 from docx.text.paragraph import Paragraph
-
-from flagship_converter.core.converters.base import safe_output_path
-from flagship_converter.core.converters.media import get_binary_path, get_wkhtmltopdf_path
-from flagship_converter.core.converters.pdf_docx import (
-    convert_pdf_to_docx,
-    sanitize_for_xml,
-)
 
 if TYPE_CHECKING:
     from docling_core.types.doc.document import DoclingDocument
@@ -40,6 +32,16 @@ os.environ.setdefault("HF_HUB_OFFLINE", "1")
 os.environ.setdefault("TRANSFORMERS_OFFLINE", "1")
 os.environ["LOKY_MAX_CPU_COUNT"] = "1"
 os.environ["OMP_NUM_THREADS"] = "1"
+
+import huggingface_hub.file_download as _hf_fd  # noqa: E402, I001
+
+from flagship_converter.core.converters.base import safe_output_path  # noqa: E402
+from flagship_converter.core.converters.media import get_binary_path, get_wkhtmltopdf_path  # noqa: E402
+from flagship_converter.core.converters.pdf_docx import (  # noqa: E402
+    convert_pdf_to_docx,
+    sanitize_for_xml,
+)
+
 
 def _safe_symlink(src: str, dst: str, **kwargs: object) -> None:
     try:
