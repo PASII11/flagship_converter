@@ -173,3 +173,118 @@ def test_extract_text_paragraphs_raises_for_image_only(tmp_path: Path) -> None:
 
     with pytest.raises(RuntimeError, match="no extractable text"):
         extract_text_paragraphs(pdf)
+
+
+def test_convert_pdf_to_docx_prefers_pdf2docx_for_digital(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from flagship_converter.core.converters import pdf_docx
+
+    calls: list[str] = []
+    progress: list[int] = []
+
+    def fake_pdf2docx(inp: Path, out: Path) -> None:
+        calls.append("pdf2docx")
+        out.write_bytes(b"stub-docx")
+
+    monkeypatch.setattr(pdf_docx, "pdf_has_text_layer", lambda _p: True)
+    monkeypatch.setattr(pdf_docx, "convert_with_pdf2docx", fake_pdf2docx)
+
+    pdf_docx.convert_pdf_to_docx(
+        tmp_path / "in.pdf",
+        tmp_path / "out.docx",
+        cancel_cb=lambda: False,
+        progress_cb=progress.append,
+    )
+
+    assert calls == ["pdf2docx"]
+    assert progress[-1] == 100
+
+
+def test_convert_pdf_to_docx_falls_back_to_docling(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from flagship_converter.core.converters import pdf_docx
+
+    calls: list[str] = []
+    sentinel = object()
+
+    def failing_pdf2docx(inp: Path, out: Path) -> None:
+        calls.append("pdf2docx")
+        raise RuntimeError("boom")
+
+    def fake_renderer(dl_doc: object, out: Path) -> None:
+        assert dl_doc is sentinel
+        calls.append("docling")
+        out.write_bytes(b"stub-docx")
+
+    monkeypatch.setattr(pdf_docx, "pdf_has_text_layer", lambda _p: True)
+    monkeypatch.setattr(pdf_docx, "convert_with_pdf2docx", failing_pdf2docx)
+    monkeypatch.setattr(pdf_docx, "docling_document_to_docx", fake_renderer)
+
+    pdf_docx.convert_pdf_to_docx(
+        tmp_path / "in.pdf",
+        tmp_path / "out.docx",
+        cancel_cb=lambda: False,
+        docling_factory=lambda _p: sentinel,  # type: ignore[arg-type,return-value]
+    )
+
+    assert calls == ["pdf2docx", "docling"]
+
+
+def test_convert_pdf_to_docx_last_resort_writes_paragraphs(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from docx import Document
+
+    from flagship_converter.core.converters import pdf_docx
+
+    monkeypatch.setattr(pdf_docx, "pdf_has_text_layer", lambda _p: False)
+    monkeypatch.setattr(
+        pdf_docx, "extract_text_paragraphs", lambda _p: ["First paragraph", "Second one"]
+    )
+
+    out = tmp_path / "out.docx"
+    pdf_docx.convert_pdf_to_docx(
+        tmp_path / "in.pdf", out, cancel_cb=lambda: False, docling_factory=None
+    )
+
+    texts = [p.text for p in Document(str(out)).paragraphs]
+    assert "First paragraph" in texts
+    assert "Second one" in texts
+
+
+def test_convert_pdf_to_docx_cancelled_before_start(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from flagship_converter.core.converters import pdf_docx
+
+    def must_not_run(_p: Path) -> bool:
+        raise AssertionError("classifier must not run after cancellation")
+
+    monkeypatch.setattr(pdf_docx, "pdf_has_text_layer", must_not_run)
+
+    out = tmp_path / "out.docx"
+    pdf_docx.convert_pdf_to_docx(tmp_path / "in.pdf", out, cancel_cb=lambda: True)
+
+    assert not out.exists()
+
+
+def test_convert_pdf_to_docx_raises_when_all_engines_fail(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    from flagship_converter.core.converters import pdf_docx
+
+    def failing_extract(_p: Path) -> list[str]:
+        raise RuntimeError("no extractable text")
+
+    monkeypatch.setattr(pdf_docx, "pdf_has_text_layer", lambda _p: False)
+    monkeypatch.setattr(pdf_docx, "extract_text_paragraphs", failing_extract)
+
+    with pytest.raises(RuntimeError, match="Failed to convert in.pdf"):
+        pdf_docx.convert_pdf_to_docx(
+            tmp_path / "in.pdf",
+            tmp_path / "out.docx",
+            cancel_cb=lambda: False,
+            docling_factory=None,
+        )

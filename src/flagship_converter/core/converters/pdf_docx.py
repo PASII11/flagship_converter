@@ -5,6 +5,7 @@ from __future__ import annotations
 import io
 import logging
 import re
+from collections.abc import Callable
 from pathlib import Path
 from typing import TYPE_CHECKING
 
@@ -177,3 +178,81 @@ def extract_text_paragraphs(input_path: Path) -> list[str]:
             "scanned PDFs or image-only documents."
         )
     return paragraphs
+
+
+DoclingFactory = Callable[[Path], "DoclingDocument"]
+
+
+def convert_pdf_to_docx(
+    input_path: Path,
+    output_path: Path,
+    cancel_cb: Callable[[], bool],
+    progress_cb: Callable[[int], None] | None = None,
+    docling_factory: DoclingFactory | None = None,
+) -> None:
+    """Цепочка: pdf2docx (цифровые) → Docling (сканы) → текст с абзацами."""
+    if cancel_cb():
+        return
+
+    try:
+        is_digital = pdf_has_text_layer(input_path)
+    except Exception as exc:
+        logger.warning("PDF text-layer detection failed for %s: %s", input_path.name, exc)
+        is_digital = True
+
+    if progress_cb:
+        progress_cb(10)
+    if cancel_cb():
+        return
+
+    last_error: Exception | None = None
+
+    if is_digital:
+        try:
+            if progress_cb:
+                progress_cb(20)
+            convert_with_pdf2docx(input_path, output_path)
+            if progress_cb:
+                progress_cb(100)
+            return
+        except Exception as exc:
+            last_error = exc
+            logger.warning("pdf2docx failed for %s, falling back: %s", input_path.name, exc)
+
+    if cancel_cb():
+        return
+
+    if docling_factory is not None:
+        try:
+            if progress_cb:
+                progress_cb(40)
+            dl_doc = docling_factory(input_path)
+            if cancel_cb():
+                return
+            if progress_cb:
+                progress_cb(90)
+            docling_document_to_docx(dl_doc, output_path)
+            if progress_cb:
+                progress_cb(100)
+            return
+        except Exception as exc:
+            last_error = exc
+            logger.warning("Docling failed for %s, falling back: %s", input_path.name, exc)
+
+    if cancel_cb():
+        return
+
+    try:
+        paragraphs = extract_text_paragraphs(input_path)
+    except Exception as exc:
+        raise RuntimeError(
+            f"Failed to convert {input_path.name} to DOCX: {last_error or exc}"
+        ) from exc
+
+    doc = Document()
+    for paragraph in paragraphs:
+        doc.add_paragraph(sanitize_for_xml(paragraph))
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    doc.save(str(output_path))
+    if progress_cb:
+        progress_cb(100)
