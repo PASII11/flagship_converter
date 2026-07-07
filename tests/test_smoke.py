@@ -265,10 +265,10 @@ def test_docling_artifacts_are_optional_for_text_fallback(monkeypatch, tmp_path)
     assert document._docling_artifacts_path() is None
 
 
-def test_pdf_to_docx_works_without_docling_models(monkeypatch, tmp_path) -> None:
+def test_pdf_to_docx_falls_back_to_text_extraction(monkeypatch, tmp_path) -> None:
     from docx import Document
 
-    from flagship_converter.core.converters import document
+    from flagship_converter.core.converters import document, pdf_docx
     from flagship_converter.core.converters.document import DocConverter
 
     src = tmp_path / "sample.pdf"
@@ -276,10 +276,11 @@ def test_pdf_to_docx_works_without_docling_models(monkeypatch, tmp_path) -> None
     src.write_bytes(b"%PDF-1.4\n% test placeholder")
 
     monkeypatch.setattr(document, "_docling_artifacts_path", lambda: None)
+    monkeypatch.setattr(pdf_docx, "pdf_has_text_layer", lambda _p: False)
     monkeypatch.setattr(
-        document,
-        "_extract_pdf_text_as_markdown",
-        lambda _path: "# Sample\n\nHello from PDF",
+        pdf_docx,
+        "extract_text_paragraphs",
+        lambda _p: ["Sample", "Hello from PDF"],
     )
 
     DocConverter().convert(src, out, {}, cancel_cb=lambda: False)

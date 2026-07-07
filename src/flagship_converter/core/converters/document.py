@@ -6,7 +6,6 @@ import gc
 import html
 import mimetypes
 import os
-import re
 import shutil
 import subprocess
 import sys
@@ -14,6 +13,7 @@ import tempfile
 import time
 from collections.abc import Callable
 from pathlib import Path
+from typing import TYPE_CHECKING
 
 import markdown
 import pdfkit
@@ -22,6 +22,9 @@ from docx.document import Document as DocxDocument
 from docx.oxml.ns import qn
 from docx.table import Table
 from docx.text.paragraph import Paragraph
+
+if TYPE_CHECKING:
+    from docling_core.types.doc.document import DoclingDocument
 
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 os.environ["HUGGINGFACE_HUB_VERBOSITY"] = "error"
@@ -44,18 +47,13 @@ _hf_fd._create_symlink = _safe_symlink
 
 from flagship_converter.core.converters.base import safe_output_path
 from flagship_converter.core.converters.media import get_binary_path, get_wkhtmltopdf_path
+from flagship_converter.core.converters.pdf_docx import (
+    convert_pdf_to_docx,
+    sanitize_for_xml,
+)
 
 SUPPORTED_INPUT = {".pdf", ".docx", ".md"}
 SUPPORTED_OUTPUT = {"pdf", "docx", "md"}
-
-_XML_INCOMPATIBLE = re.compile(
-    "[\\x00-\\x08\\x0b\\x0c\\x0e-\\x1f\\x7f"
-    "\\ud800-\\udfff\\ufdd0-\\ufddf\\ufffe\\uffff]"
-)
-
-
-def _sanitize_for_xml(text: str) -> str:
-    return _XML_INCOMPATIBLE.sub("", text)
 
 
 def _resource_path(name: str) -> Path:
@@ -84,6 +82,46 @@ def _docling_artifacts_path() -> Path | None:
             return candidate
 
     return None
+
+
+def _docling_convert_document(
+    input_path: Path, generate_images: bool = False
+) -> DoclingDocument:
+    artifacts_path = _docling_artifacts_path()
+    if artifacts_path is None:
+        raise RuntimeError("Docling offline models are not bundled.")
+
+    from docling.datamodel.accelerator_options import AcceleratorOptions
+    from docling.datamodel.base_models import InputFormat
+    from docling.datamodel.pipeline_options import PdfPipelineOptions
+    from docling.document_converter import DocumentConverter, PdfFormatOption
+
+    pipeline_options = PdfPipelineOptions()
+    pipeline_options.accelerator_options = AcceleratorOptions(num_threads=1)
+    pipeline_options.artifacts_path = artifacts_path
+    pipeline_options.enable_remote_services = False
+    if generate_images:
+        pipeline_options.generate_picture_images = True
+        pipeline_options.images_scale = 2.0
+
+    converter = None
+    conv_res = None
+    try:
+        converter = DocumentConverter(
+            allowed_formats=[InputFormat.PDF, InputFormat.DOCX],
+            format_options={
+                InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
+            },
+        )
+        conv_res = converter.convert(str(input_path))
+        if conv_res.document is None:
+            raise RuntimeError(f"Docling returned no document for {input_path.name}")
+        document = conv_res.document
+        return document
+    finally:
+        del conv_res
+        del converter
+        gc.collect()
 
 
 def _extract_pdf_text_as_markdown(input_path: Path) -> str:
@@ -402,6 +440,23 @@ class DocConverter:
                 progress_cb(100)
             return
 
+        if input_path.suffix.lower() == ".pdf" and target_ext == "docx":
+            docling_factory = None
+            if _docling_artifacts_path() is not None:
+
+                def _factory(path: Path) -> DoclingDocument:
+                    return _docling_convert_document(path, generate_images=True)
+
+                docling_factory = _factory
+            convert_pdf_to_docx(
+                input_path,
+                output_path,
+                cancel_cb=cancel_cb,
+                progress_cb=progress_cb,
+                docling_factory=docling_factory,
+            )
+            return
+
         if input_path.suffix.lower() == ".md":
             md_text = input_path.read_text(encoding="utf-8")
         else:
@@ -418,34 +473,7 @@ class DocConverter:
                 if cancel_cb():
                     return
             else:
-                from docling.datamodel.accelerator_options import AcceleratorOptions
-                from docling.datamodel.base_models import InputFormat
-                from docling.datamodel.pipeline_options import PdfPipelineOptions
-                from docling.document_converter import DocumentConverter, PdfFormatOption
-
-                accelerator_options = AcceleratorOptions(num_threads=1)
-                pipeline_options = PdfPipelineOptions()
-                pipeline_options.accelerator_options = accelerator_options
-                pipeline_options.artifacts_path = artifacts_path
-                pipeline_options.enable_remote_services = False
-
-                converter = None
-                conv_res = None
-                try:
-                    converter = DocumentConverter(
-                        allowed_formats=[InputFormat.PDF, InputFormat.DOCX],
-                        format_options={
-                            InputFormat.PDF: PdfFormatOption(pipeline_options=pipeline_options)
-                        },
-                    )
-                    conv_res = converter.convert(str(input_path))
-                    if conv_res.document is None:
-                        raise RuntimeError(f"Docling returned no document for {input_path.name}")
-                    md_text = conv_res.document.export_to_markdown()
-                finally:
-                    del conv_res
-                    del converter
-                    gc.collect()
+                md_text = _docling_convert_document(input_path).export_to_markdown()
 
         if cancel_cb():
             return
@@ -475,7 +503,7 @@ img {{ max-width: 100%; }}
 
         elif target_ext == "docx":
             doc = Document()
-            for line in _sanitize_for_xml(md_text).split("\n"):
+            for line in sanitize_for_xml(md_text).split("\n"):
                 if line.startswith("# "):
                     doc.add_heading(line[2:], level=1)
                 elif line.startswith("## "):

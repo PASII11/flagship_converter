@@ -288,3 +288,21 @@ def test_convert_pdf_to_docx_raises_when_all_engines_fail(
             cancel_cb=lambda: False,
             docling_factory=None,
         )
+
+
+def test_doc_converter_pdf_to_docx_integration(tmp_path: Path) -> None:
+    from docx import Document
+
+    from flagship_converter.core.converters.document import DocConverter
+
+    pdf = tmp_path / "report.pdf"
+    out = tmp_path / "report.docx"
+    _make_digital_pdf(pdf, with_image=True)
+
+    DocConverter().convert(pdf, out, {}, cancel_cb=lambda: False)
+
+    assert out.exists()
+    text = "\n".join(p.text for p in Document(str(out)).paragraphs)
+    assert "digital document" in text
+    media = [n for n in zipfile.ZipFile(out).namelist() if n.startswith("word/media/")]
+    assert media, "image from the PDF must be embedded in the DOCX"
