@@ -26,6 +26,9 @@ from docx.text.paragraph import Paragraph
 if TYPE_CHECKING:
     from docling_core.types.doc.document import DoclingDocument
 
+# Порядок ниже намеренный: huggingface_hub читает эти переменные окружения
+# при импорте, поэтому env-блок должен стоять до import huggingface_hub
+# (см. noqa: E402/I001 ниже). Не переставлять ради линтера.
 os.environ["HF_HUB_DISABLE_SYMLINKS_WARNING"] = "1"
 os.environ["HUGGINGFACE_HUB_VERBOSITY"] = "error"
 os.environ.setdefault("HF_HUB_OFFLINE", "1")

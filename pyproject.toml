@@ -17,6 +17,14 @@ dependencies = [
 [project.optional-dependencies]
 dev = ["pytest", "ruff", "mypy"]
 
+[tool.uv]
+# pdf2docx pulls opencv-python-headless, which clobbers the cv2 package
+# already provided by opencv-python (required by rapidocr). Only one OpenCV
+# distribution may be installed; drop the headless one.
+override-dependencies = [
+    "opencv-python-headless ; sys_platform == 'never'",
+]
+
 [build-system]
 requires = ["hatchling"]
 build-backend = "hatchling.build"

@@ -88,6 +88,7 @@ def main() -> None:
         "--collect-all=pypdfium2",
         "--collect-all=pdf2docx",
         "--collect-all=fitz",
+        "--collect-all=pymupdf",
         "--collect-all=torch",
         "--collect-all=spacy",
         "--collect-all=transformers",
