@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import io
+import zipfile
 from pathlib import Path
 
 from PIL import Image
@@ -66,3 +67,22 @@ def test_pdf_has_text_layer_false_for_image_only(tmp_path: Path) -> None:
     _make_image_only_pdf(pdf)
 
     assert pdf_has_text_layer(pdf) is False
+
+
+def test_convert_with_pdf2docx_preserves_text_and_images(tmp_path: Path) -> None:
+    from docx import Document
+
+    from flagship_converter.core.converters.pdf_docx import convert_with_pdf2docx
+
+    pdf = tmp_path / "digital.pdf"
+    out = tmp_path / "digital.docx"
+    _make_digital_pdf(pdf, with_image=True)
+
+    convert_with_pdf2docx(pdf, out)
+
+    assert out.exists()
+    assert out.stat().st_size > 0
+    text = "\n".join(p.text for p in Document(str(out)).paragraphs)
+    assert "digital document" in text
+    media = [n for n in zipfile.ZipFile(out).namelist() if n.startswith("word/media/")]
+    assert media, "embedded PDF image must survive conversion"

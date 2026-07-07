@@ -47,3 +47,19 @@ def pdf_has_text_layer(
         return text_pages / page_count >= min_text_page_ratio
     finally:
         pdf.close()
+
+
+def convert_with_pdf2docx(input_path: Path, output_path: Path) -> None:
+    """Цифровой путь: pdf2docx воспроизводит раскладку, шрифты, картинки, таблицы."""
+    from pdf2docx import Converter
+
+    logging.getLogger("pdf2docx").setLevel(logging.ERROR)
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    converter = Converter(str(input_path))
+    try:
+        converter.convert(str(output_path))
+    finally:
+        converter.close()
+
+    if not output_path.exists() or output_path.stat().st_size == 0:
+        raise RuntimeError("pdf2docx did not produce a DOCX output.")
