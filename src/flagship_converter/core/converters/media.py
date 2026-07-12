@@ -169,3 +169,12 @@ def run_ffmpeg(
     if process.returncode != 0 and not cancel_cb():
         err_str = "\n".join(error_log)
         raise RuntimeError(f"FFmpeg error (code {process.returncode}):\n{err_str}")
+
+
+def audio_encode_args(target_ext: str, audio_bitrate: str) -> list[str]:
+    """Аргументы FFmpeg для кодирования аудио: одинаковы для аудио- и видео-входов."""
+    if target_ext == "flac":
+        return ["-c:a", "flac"]
+    if target_ext == "wav":
+        return ["-c:a", "pcm_s16le"]
+    return ["-b:a", audio_bitrate]

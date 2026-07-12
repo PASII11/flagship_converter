@@ -6,7 +6,7 @@ from collections.abc import Callable
 from pathlib import Path
 
 from flagship_converter.core.converters.base import safe_output_path
-from flagship_converter.core.converters.media import get_ffmpeg_path, run_ffmpeg
+from flagship_converter.core.converters.media import audio_encode_args, get_ffmpeg_path, run_ffmpeg
 
 SUPPORTED_INPUT = {".mp3", ".wav", ".flac", ".aac", ".m4a", ".ogg", ".wma"}
 SUPPORTED_OUTPUT = {"mp3", "wav", "flac", "aac", "ogg"}
@@ -45,13 +45,6 @@ class AudioConverter:
         audio_bitrate = str(params.get("audio_bitrate", "192k"))
 
         cmd = [get_ffmpeg_path(), "-y", "-i", str(input_path)]
-
-        if target_ext == "flac":
-            cmd.extend(["-c:a", "flac"])
-        elif target_ext == "wav":
-            cmd.extend(["-c:a", "pcm_s16le"])
-        else:
-            cmd.extend(["-b:a", audio_bitrate])
-
+        cmd.extend(audio_encode_args(target_ext, audio_bitrate))
         cmd.append(str(output_path))
         run_ffmpeg(cmd, cancel_cb, progress_cb)
