@@ -143,3 +143,32 @@ def test_construct_time_translation(app, tmp_path):
     row = FileRow(f)
     assert row._preset_label.text() == "Preset"
     assert "Image" in row._meta.text()
+
+
+def test_rel_subdir_shown_in_meta(app, tmp_path):
+    sub = tmp_path / "photos" / "2024"
+    sub.mkdir(parents=True)
+    f = sub / "a.jpg"
+    f.write_bytes(b"x")
+    row = FileRow(f, rel_subdir=Path("photos") / "2024")
+    assert row.rel_subdir == Path("photos") / "2024"
+    assert row._meta.text().startswith("photos/2024 · ")
+
+
+def test_no_rel_subdir_keeps_meta_format(app, tmp_path):
+    f = tmp_path / "a.jpg"
+    f.write_bytes(b"x")
+    row = FileRow(f)
+    assert row.rel_subdir is None
+    assert row._meta.text() == "Изображение · 1 B"
+
+
+def test_retranslate_keeps_rel_prefix(app, tmp_path):
+    from flagship_converter import i18n
+
+    f = tmp_path / "a.jpg"
+    f.write_bytes(b"x")
+    row = FileRow(f, rel_subdir=Path("photos"))
+    i18n.set_language("en")
+    row.retranslate()
+    assert row._meta.text().startswith("photos · Image")

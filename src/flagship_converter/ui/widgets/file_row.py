@@ -82,10 +82,12 @@ class FileRow(QFrame):
         file_path: Path,
         card_id: str | None = None,
         default_video_codec: str | None = None,
+        rel_subdir: Path | None = None,
     ) -> None:
         super().__init__()
         self.card_id = card_id or str(uuid.uuid4())
         self.file_path = file_path
+        self.rel_subdir = rel_subdir
         self.category = get_category(file_path)
         self._status = JobStatus.PENDING
         self._output_path: Path | None = None
@@ -132,7 +134,7 @@ class FileRow(QFrame):
         except OSError:
             size = "—"
         self._size_text = size
-        self._meta = QLabel(f"{t(CATEGORY_TITLES[self.category])} · {size}")
+        self._meta = QLabel(self._meta_text())
 
         self._format_box = QComboBox()
         self._format_box.addItems(OUTPUT_FORMATS.get(self.category, []))
@@ -420,10 +422,17 @@ class FileRow(QFrame):
         self._remove_btn.setEnabled(not locked)
 
 
+    def _meta_text(self) -> str:
+        """Генерирует текст мета-информации с учётом относительного подпути."""
+        base = f"{t(CATEGORY_TITLES[self.category])} · {self._size_text}"
+        if self.rel_subdir is not None:
+            return f"{self.rel_subdir.as_posix()} · {base}"
+        return base
+
     def retranslate(self) -> None:
         self._applying = True
         try:
-            self._meta.setText(f"{t(CATEGORY_TITLES[self.category])} · {self._size_text}")
+            self._meta.setText(self._meta_text())
             self._remove_btn.setToolTip(t("Убрать файл из очереди"))
             self._preset_label.setText(t("Пресет"))
             self._preset_box.setItemText(0, t("Свои настройки"))
