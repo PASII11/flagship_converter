@@ -6,10 +6,15 @@ from collections.abc import Callable
 from pathlib import Path
 
 from flagship_converter.core.converters.base import safe_output_path
-from flagship_converter.core.converters.media import get_ffmpeg_path, run_ffmpeg
+from flagship_converter.core.converters.media import (
+    audio_encode_args,
+    get_ffmpeg_path,
+    run_ffmpeg,
+)
 
 SUPPORTED_INPUT = {".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv", ".m4v"}
-SUPPORTED_OUTPUT = {"mp4", "mkv", "avi", "webm"}
+AUDIO_TARGETS = {"mp3", "wav", "flac", "aac", "ogg"}
+SUPPORTED_OUTPUT = {"mp4", "mkv", "avi", "webm"} | AUDIO_TARGETS
 
 
 class VideoConverter:
@@ -42,6 +47,10 @@ class VideoConverter:
             return
 
         target_ext = output_path.suffix.lower().lstrip(".")
+        if target_ext in AUDIO_TARGETS:
+            self._convert_to_audio(input_path, output_path, params, cancel_cb, progress_cb)
+            return
+
         video_bitrate = str(params.get("video_bitrate", "2.5M"))
         codec_id = str(params.get("video_codec", "auto"))
 
@@ -62,4 +71,22 @@ class VideoConverter:
             cmd.extend(["-c:v", vcodec, "-b:v", video_bitrate, "-c:a", "aac", "-b:a", "192k"])
 
         cmd.append(str(output_path))
+        run_ffmpeg(cmd, cancel_cb, progress_cb)
+
+    def _convert_to_audio(
+        self,
+        input_path: Path,
+        output_path: Path,
+        params: dict[str, object],
+        cancel_cb: Callable[[], bool],
+        progress_cb: Callable[[int], None] | None,
+    ) -> None:
+        """Извлечение аудио дорожки из видео файла."""
+        target_ext = output_path.suffix.lower().lstrip(".")
+        audio_bitrate = str(params.get("audio_bitrate", "192k"))
+        cmd = [
+            get_ffmpeg_path(), "-y", "-i", str(input_path), "-vn",
+            *audio_encode_args(target_ext, audio_bitrate),
+            str(output_path),
+        ]
         run_ffmpeg(cmd, cancel_cb, progress_cb)
