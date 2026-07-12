@@ -35,9 +35,14 @@ _TRANSLATIONS: dict[str, str] = {
     "Язык": "Language",
     "Авто (CPU x264)": "Auto (CPU x264)",
     # converter_page.py
-    "Добавьте файлы или перетащите их в окно": "Add files or drag them into the window",
+    "Добавьте файлы или папки, или перетащите их в окно": (
+        "Add files or folders, or drag them into the window"
+    ),
     "Открыть папку вывода": "Open output folder",
     "Выберите файлы для конвертации": "Choose files to convert",
+    "Выберите папку с файлами": "Choose a folder with files",
+    "Найдено {n} файлов. Добавить все?": "Found {n} files. Add them all?",
+    "В папке не найдено поддерживаемых файлов": "No supported files found in the folder",
     "Выбранный формат недоступен для этого файла.": (
         "The selected format is not available for this file."
     ),

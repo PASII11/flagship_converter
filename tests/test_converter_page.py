@@ -89,7 +89,7 @@ def test_construct_time_translation(app, tmp_path):
     page = ConverterPage(
         ConversionEngine(), AppSettings(qs), PresetStore(tmp_path / "presets.json"),
     )
-    assert page._footer_label.text() == "Add files or drag them into the window"
+    assert page._footer_label.text() == "Add files or folders, or drag them into the window"
 
 
 def test_retranslate_updates_footer_and_children(page):
@@ -98,4 +98,58 @@ def test_retranslate_updates_footer_and_children(page):
     i18n.set_language("en")
     page.retranslate()
     assert page._command_bar._add_btn.text() == "Add files"
-    assert page._footer_label.text() == "Add files or drag them into the window"
+    assert page._footer_label.text() == "Add files or folders, or drag them into the window"
+
+
+def test_add_folder_expands_recursively(page, tmp_path):
+    root = tmp_path / "photos"
+    (root / "2024").mkdir(parents=True)
+    (root / "2024" / "a.jpg").write_bytes(b"x")
+    (root / "readme.txt").write_bytes(b"x")
+    page.add_files([str(root)])
+    assert page._queue.count() == 1
+    assert page._queue.rows()[0].rel_subdir == Path("photos") / "2024"
+
+
+def test_output_dir_fixed_preserves_structure(page, tmp_path):
+    page._settings.output_mode = "fixed"
+    page._settings.fixed_output_dir = str(tmp_path / "out")
+    root = tmp_path / "photos"
+    root.mkdir()
+    (root / "a.jpg").write_bytes(b"x")
+    page.add_files([str(root)])
+    row = page._queue.rows()[0]
+    assert page._output_dir_for(row) == tmp_path / "out" / "photos"
+
+
+def test_output_dir_beside_unchanged(page, tmp_path):
+    f = tmp_path / "a.jpg"
+    f.write_bytes(b"x")
+    page.add_files([str(f)])
+    row = page._queue.rows()[0]
+    assert page._output_dir_for(row) == tmp_path / "converted"
+
+
+def test_folder_without_supported_files_sets_footer(page, tmp_path):
+    root = tmp_path / "docs_only"
+    root.mkdir()
+    (root / "readme.txt").write_bytes(b"x")
+    page.add_files([str(root)])
+    assert page._queue.count() == 0
+    assert page._footer_label.text() == "В папке не найдено поддерживаемых файлов"
+
+
+def test_large_drop_requires_confirmation(page, tmp_path, monkeypatch):
+    from PySide6.QtWidgets import QMessageBox
+
+    root = tmp_path / "big"
+    root.mkdir()
+    for i in range(501):
+        (root / f"f{i:03}.jpg").write_bytes(b"x")
+    monkeypatch.setattr(
+        QMessageBox,
+        "question",
+        staticmethod(lambda *a, **k: QMessageBox.StandardButton.No),
+    )
+    page.add_files([str(root)])
+    assert page._queue.count() == 0

@@ -10,6 +10,7 @@ from PySide6.QtWidgets import (
     QFileDialog,
     QHBoxLayout,
     QLabel,
+    QMessageBox,
     QProgressBar,
     QPushButton,
     QVBoxLayout,
@@ -17,14 +18,18 @@ from PySide6.QtWidgets import (
 )
 
 from flagship_converter.core.engine import ConversionEngine
+from flagship_converter.core.expand import expand_input_paths
 from flagship_converter.core.models import ConversionPlan, JobStatus
 from flagship_converter.i18n import t
 from flagship_converter.ui import theme
 from flagship_converter.ui.presets import PresetStore
 from flagship_converter.ui.settings import AppSettings
 from flagship_converter.ui.widgets.command_bar import CommandBar
+from flagship_converter.ui.widgets.file_row import FileRow
 from flagship_converter.ui.widgets.task_queue import TaskQueue
 from flagship_converter.ui.workers import PlanRunner
+
+MAX_FILES_WITHOUT_CONFIRM = 500
 
 
 class ConverterPage(QWidget):
@@ -65,6 +70,7 @@ class ConverterPage(QWidget):
 
         self._command_bar = CommandBar()
         self._command_bar.add_files_clicked.connect(self._pick_files)
+        self._command_bar.add_folder_clicked.connect(self._pick_add_folder)
         self._command_bar.folder_clicked.connect(self._pick_folder)
         self._command_bar.convert_clicked.connect(self._start_conversion)
         self._command_bar.cancel_clicked.connect(self._cancel_conversion)
@@ -73,13 +79,14 @@ class ConverterPage(QWidget):
         self._queue = TaskQueue()
         self._queue.files_changed.connect(self._on_files_changed)
         self._queue.add_clicked.connect(self._pick_files)
+        self._queue.add_folder_clicked.connect(self._pick_add_folder)
         col.addWidget(self._queue, stretch=1)
 
         footer = QWidget()
         f = QHBoxLayout(footer)
         f.setContentsMargins(theme.SPACING["xs"], 0, theme.SPACING["xs"], 0)
         f.setSpacing(theme.SPACING["md"])
-        self._footer_label = QLabel(t("Добавьте файлы или перетащите их в окно"))
+        self._footer_label = QLabel(t("Добавьте файлы или папки, или перетащите их в окно"))
         self._overall = QProgressBar()
         self._overall.setRange(0, 100)
         self._overall.setTextVisible(False)
@@ -104,7 +111,24 @@ class ConverterPage(QWidget):
     def add_files(self, paths: list[str]) -> None:
         if self._converting:
             return
-        self._queue.add_files(paths)
+        expanded = expand_input_paths(
+            paths, self._engine.supported_input_extensions()
+        )
+        if len(expanded) > MAX_FILES_WITHOUT_CONFIRM:
+            answer = QMessageBox.question(
+                self,
+                t("Добавить папку"),
+                t("Найдено {n} файлов. Добавить все?").format(n=len(expanded)),
+            )
+            if answer != QMessageBox.StandardButton.Yes:
+                return
+        had_dirs = any(Path(p).is_dir() for p in paths)
+        from_dirs = any(e.source_root is not None for e in expanded)
+        self._queue.add_files(expanded)
+        if had_dirs and not from_dirs:
+            self._footer_label.setText(
+                t("В папке не найдено поддерживаемых файлов")
+            )
 
     def apply_preset_by_id(self, preset_id: str) -> None:
         preset = self._store.get(preset_id) if preset_id else None
@@ -119,6 +143,15 @@ class ConverterPage(QWidget):
         )
         if paths:
             self.add_files(paths)
+
+    def _pick_add_folder(self) -> None:
+        if self._converting:
+            return
+        folder = QFileDialog.getExistingDirectory(
+            self, t("Выберите папку с файлами")
+        )
+        if folder:
+            self.add_files([folder])
 
     def _pick_folder(self) -> None:
         folder = QFileDialog.getExistingDirectory(
@@ -135,10 +168,13 @@ class ConverterPage(QWidget):
         else:
             self._command_bar.set_folder_text(t("converted/ рядом с исходником"))
 
-    def _output_dir_for(self, row_path: Path) -> Path:
+    def _output_dir_for(self, row: FileRow) -> Path:
         if self._settings.output_mode == "fixed" and self._settings.fixed_output_dir:
-            return Path(self._settings.fixed_output_dir)
-        return row_path.parent / "converted"
+            base = Path(self._settings.fixed_output_dir)
+            if row.rel_subdir is not None:
+                return base / row.rel_subdir
+            return base
+        return row.file_path.parent / "converted"
 
     def _on_files_changed(self, _count: int) -> None:
         self._sync_controls()
@@ -151,7 +187,7 @@ class ConverterPage(QWidget):
         )
         if self._queue.count() == 0:
             self._footer_label.setText(
-                t("Добавьте файлы или перетащите их в окно")
+                t("Добавьте файлы или папки, или перетащите их в окно")
             )
             self._overall.setValue(0)
             self._percent_label.setText("")
@@ -170,7 +206,7 @@ class ConverterPage(QWidget):
                 continue
             job = self._engine.build_job(
                 file_path=row.file_path,
-                output_dir=self._output_dir_for(row.file_path),
+                output_dir=self._output_dir_for(row),
                 target_ext=row.target_ext,
                 overwrite=self._settings.overwrite,
                 params=row.job_params,
