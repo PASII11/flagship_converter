@@ -61,3 +61,66 @@ def test_video_target_still_uses_video_codec(ffmpeg_calls, tmp_path):
     (cmd,) = ffmpeg_calls
     assert "-c:v" in cmd
     assert "-vn" not in cmd
+
+
+def test_gif_two_pass_palette(ffmpeg_calls, tmp_path):
+    _convert(tmp_path, "gif", {"gif_fps": 20, "gif_width": 320})
+    assert len(ffmpeg_calls) == 2
+    pass1, pass2 = ffmpeg_calls
+    vf = pass1[pass1.index("-vf") + 1]
+    assert vf == "fps=20,scale=320:-1:flags=lanczos,palettegen"
+    lavfi = pass2[pass2.index("-lavfi") + 1]
+    assert lavfi == "fps=20,scale=320:-1:flags=lanczos[x];[x][1:v]paletteuse"
+    second_input = pass2[pass2.index("-i", pass2.index("-i") + 1) + 1]
+    assert second_input.endswith(".palette.png")
+
+
+def test_gif_original_width_skips_scale(ffmpeg_calls, tmp_path):
+    _convert(tmp_path, "gif", {"gif_width": 0})
+    pass1, _pass2 = ffmpeg_calls
+    vf = pass1[pass1.index("-vf") + 1]
+    assert vf == "fps=15,palettegen"
+
+
+def test_gif_progress_maps_to_halves(ffmpeg_calls, tmp_path):
+    seen: list[int] = []
+    conv = VideoConverter()
+    src = tmp_path / "in.mp4"
+    src.write_bytes(b"x")
+    conv.convert(src, tmp_path / "out.gif", {}, lambda: False, seen.append)
+    assert seen == [50, 100]
+
+
+def test_gif_cancel_between_passes(tmp_path, monkeypatch):
+    calls: list[list[str]] = []
+    cancelled = {"flag": False}
+
+    def fake_run(cmd, cancel_cb, progress_cb=None):
+        calls.append(list(cmd))
+        cancelled["flag"] = True
+
+    monkeypatch.setattr(video_mod, "run_ffmpeg", fake_run)
+    monkeypatch.setattr(video_mod, "get_ffmpeg_path", lambda: "ffmpeg")
+    conv = VideoConverter()
+    src = tmp_path / "in.mp4"
+    src.write_bytes(b"x")
+    conv.convert(src, tmp_path / "out.gif", {}, lambda: cancelled["flag"], None)
+    assert len(calls) == 1
+
+
+def test_gif_palette_removed_on_error(tmp_path, monkeypatch):
+    def fake_run(cmd, cancel_cb, progress_cb=None):
+        if "-vf" in cmd:
+            Path(cmd[-1]).write_bytes(b"palette")
+            return
+        raise RuntimeError("pass 2 failed")
+
+    monkeypatch.setattr(video_mod, "run_ffmpeg", fake_run)
+    monkeypatch.setattr(video_mod, "get_ffmpeg_path", lambda: "ffmpeg")
+    conv = VideoConverter()
+    src = tmp_path / "in.mp4"
+    src.write_bytes(b"x")
+    out = tmp_path / "out.gif"
+    with pytest.raises(RuntimeError):
+        conv.convert(src, out, {}, lambda: False, None)
+    assert not out.with_suffix(".palette.png").exists()

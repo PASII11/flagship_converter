@@ -34,7 +34,7 @@ def test_build_job_routes_video_to_audio_targets(tmp_path):
     engine = ConversionEngine()
     src = tmp_path / "v.mp4"
     src.write_bytes(b"x")
-    for target in ("mp3",):
+    for target in ("mp3", "gif"):
         job = engine.build_job(
             file_path=src,
             output_dir=tmp_path,
