@@ -403,6 +403,7 @@ def _convert_docx_to_pdf_preserving_layout(
 class DocConverter:
     """Конвертирует документы с сохранением структуры (PyInstaller-safe)."""
 
+    supported_inputs = SUPPORTED_INPUT
     supported_outputs = SUPPORTED_OUTPUT
 
     def __init__(self) -> None:

@@ -13,6 +13,7 @@ SUPPORTED_OUTPUT = {"mp4", "mkv", "avi", "webm"}
 
 
 class VideoConverter:
+    supported_inputs = SUPPORTED_INPUT
     supported_outputs = SUPPORTED_OUTPUT
 
     def can_handle(self, path: Path) -> bool:

@@ -74,6 +74,7 @@ def test_build_job_rejects_unsupported_target() -> None:
 
 
 class FakeConverter:
+    supported_inputs = {".in"}
     supported_outputs = {"out"}
 
     def __init__(self, mode: str = "success") -> None:

@@ -17,6 +17,7 @@ SUPPORTED_OUTPUT = {"png", "jpg", "jpeg", "webp", "bmp", "tiff"}
 class ImageConverter:
     """Конвертирует изображения между форматами через Pillow."""
 
+    supported_inputs = SUPPORTED_INPUT
     supported_outputs = SUPPORTED_OUTPUT
 
     def can_handle(self, path: Path) -> bool:

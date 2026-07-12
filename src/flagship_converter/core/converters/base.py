@@ -12,6 +12,7 @@ class ConversionCancelled(RuntimeError):
 
 
 class Converter(Protocol):
+    supported_inputs: set[str]
     supported_outputs: set[str]
 
     def can_handle(self, path: Path) -> bool: ...

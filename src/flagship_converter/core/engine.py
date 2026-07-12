@@ -12,6 +12,7 @@ from flagship_converter.core.converters.base import ConversionCancelled, Convert
 from flagship_converter.core.converters.document import DocConverter
 from flagship_converter.core.converters.image import ImageConverter
 from flagship_converter.core.converters.video import VideoConverter
+from flagship_converter.core.expand import expand_input_paths
 from flagship_converter.core.models import ConversionJob, ConversionPlan, JobStatus
 from flagship_converter.i18n import t
 
@@ -34,16 +35,15 @@ class ConversionEngine:
             return max(1, min(computed, self._max_workers))
         return computed
 
+    def supported_input_extensions(self) -> set[str]:
+        exts: set[str] = set()
+        for converter in self._converters:
+            exts |= converter.supported_inputs
+        return exts
+
     def collect_files(self, paths: Iterable[str | Path]) -> list[Path]:
-        result: list[Path] = []
-        for raw in paths:
-            try:
-                p = Path(raw)
-                if p.exists() and p.is_file():
-                    result.append(p)
-            except OSError:
-                pass
-        return result
+        expanded = expand_input_paths(paths, self.supported_input_extensions())
+        return [item.path for item in expanded]
 
     def build_job(
         self,
