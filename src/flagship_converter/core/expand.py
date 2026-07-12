@@ -20,9 +20,10 @@ class ExpandedFile:
         if self.source_root is None:
             return None
         try:
-            return self.path.parent.relative_to(self.source_root.parent)
+            rel = self.path.parent.relative_to(self.source_root.parent)
         except ValueError:
             return None
+        return None if rel == Path(".") else rel
 
 
 def expand_input_paths(
@@ -47,8 +48,11 @@ def _walk_dir(root: Path, supported_exts: set[str]) -> list[ExpandedFile]:
     found: list[ExpandedFile] = []
     walker = os.walk(root, onerror=lambda _e: None, followlinks=False)
     for dirpath, dirnames, filenames in walker:
-        dirnames[:] = sorted(d for d in dirnames if not d.startswith("."))
         base = Path(dirpath)
+        dirnames[:] = sorted(
+            d for d in dirnames
+            if not d.startswith(".") and not (base / d).is_junction()
+        )
         for name in sorted(filenames):
             file_path = base / name
             if file_path.suffix.lower() in supported_exts:

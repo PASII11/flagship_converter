@@ -1,5 +1,6 @@
 """Развёртка входных путей: файлы, папки, фильтры, порядок."""
 import os
+import subprocess
 import sys
 from pathlib import Path
 
@@ -78,3 +79,24 @@ def test_dir_symlink_not_followed(tmp_path):
     (target / "x.jpg").write_bytes(b"x")
     os.symlink(target, root / "link", target_is_directory=True)
     assert expand_input_paths([root], EXTS) == []
+
+
+@pytest.mark.skipif(sys.platform != "win32", reason="junction — механизм Windows")
+def test_dir_junction_not_followed(tmp_path):
+    root = tmp_path / "root"
+    root.mkdir()
+    target = tmp_path / "target"
+    target.mkdir()
+    (target / "x.jpg").write_bytes(b"x")
+    subprocess.run(
+        ["cmd", "/c", "mklink", "/J", str(root / "link"), str(target)],
+        check=True,
+        capture_output=True,
+    )
+    assert expand_input_paths([root], EXTS) == []
+
+
+def test_rel_subdir_none_for_filesystem_root():
+    root = Path(Path.cwd().anchor)
+    e = ExpandedFile(path=root / "a.jpg", source_root=root)
+    assert e.rel_subdir is None
