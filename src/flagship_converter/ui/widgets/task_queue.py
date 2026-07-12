@@ -6,6 +6,7 @@ from pathlib import Path
 from PySide6.QtCore import Qt, Signal
 from PySide6.QtWidgets import (
     QFrame,
+    QHBoxLayout,
     QLabel,
     QPushButton,
     QScrollArea,
@@ -24,6 +25,7 @@ from flagship_converter.ui.widgets.file_row import FileRow
 class TaskQueue(QWidget):
     files_changed = Signal(int)
     add_clicked = Signal()
+    add_folder_clicked = Signal()
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -68,7 +70,7 @@ class TaskQueue(QWidget):
         col = QVBoxLayout(frame)
         col.setAlignment(Qt.AlignmentFlag.AlignCenter)
         col.setSpacing(theme.SPACING["sm"])
-        self._empty_title = QLabel(t("Перетащите файлы сюда"))
+        self._empty_title = QLabel(t("Перетащите файлы или папки сюда"))
         self._empty_title.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self._empty_sub = QLabel(t("или нажмите кнопку, чтобы выбрать вручную"))
         self._empty_sub.setAlignment(Qt.AlignmentFlag.AlignCenter)
@@ -76,10 +78,20 @@ class TaskQueue(QWidget):
         self._empty_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._empty_btn.setFixedHeight(34)
         self._empty_btn.clicked.connect(self.add_clicked.emit)
+        self._empty_folder_btn = QPushButton(t("Выбрать папку"))
+        self._empty_folder_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._empty_folder_btn.setFixedHeight(34)
+        self._empty_folder_btn.clicked.connect(self.add_folder_clicked.emit)
         col.addWidget(self._empty_title)
         col.addWidget(self._empty_sub)
         col.addSpacing(theme.SPACING["sm"])
-        col.addWidget(self._empty_btn, alignment=Qt.AlignmentFlag.AlignCenter)
+        btn_row = QHBoxLayout()
+        btn_row.setSpacing(theme.SPACING["sm"])
+        btn_row.addStretch()
+        btn_row.addWidget(self._empty_btn)
+        btn_row.addWidget(self._empty_folder_btn)
+        btn_row.addStretch()
+        col.addLayout(btn_row)
         return frame
 
 
@@ -166,9 +178,10 @@ class TaskQueue(QWidget):
         return self.convertible_count() > 0
 
     def retranslate(self) -> None:
-        self._empty_title.setText(t("Перетащите файлы сюда"))
+        self._empty_title.setText(t("Перетащите файлы или папки сюда"))
         self._empty_sub.setText(t("или нажмите кнопку, чтобы выбрать вручную"))
         self._empty_btn.setText(t("Выбрать файлы"))
+        self._empty_folder_btn.setText(t("Выбрать папку"))
         for row in self._rows.values():
             row.retranslate()
 
@@ -192,6 +205,7 @@ class TaskQueue(QWidget):
         self._empty_title.setStyleSheet(theme.text_style(p.text_primary, 15, 600))
         self._empty_sub.setStyleSheet(theme.text_style(p.text_secondary, 13, 400))
         self._empty_btn.setStyleSheet(theme.secondary_button_qss(p))
+        self._empty_folder_btn.setStyleSheet(theme.secondary_button_qss(p))
         for row in self._rows.values():
             row.apply_theme(p)
 

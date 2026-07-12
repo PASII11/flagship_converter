@@ -96,7 +96,7 @@ def test_retranslate_updates_empty_state(app, tmp_path):
     q = TaskQueue()
     i18n.set_language("en")
     q.retranslate()
-    assert q._empty_title.text() == "Drag files here"
+    assert q._empty_title.text() == "Drag files or folders here"
     assert q._empty_btn.text() == "Choose files"
 
 
@@ -123,3 +123,12 @@ def test_re_drop_file_from_added_folder_dedupes(app, tmp_path):
     q.add_files([ExpandedFile(path=f, source_root=root)])
     assert q.add_files([f]) == 0
     assert q.count() == 1
+
+
+def test_empty_state_has_folder_button(app):
+    q = TaskQueue()
+    fired = []
+    q.add_folder_clicked.connect(lambda: fired.append(1))
+    q._empty_folder_btn.click()
+    assert fired == [1]
+    assert q._empty_title.text() == "Перетащите файлы или папки сюда"

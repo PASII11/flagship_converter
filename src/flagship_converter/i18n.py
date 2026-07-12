@@ -49,13 +49,15 @@ _TRANSLATIONS: dict[str, str] = {
     "Готово {done} · В работе {running}": "Done {done} · Running {running}",
     # command_bar.py
     "Добавить файлы": "Add files",
+    "Добавить папку": "Add folder",
     "Конвертировать": "Convert",
     "Конвертировать {n}": "Convert {n}",
     "Отменить": "Cancel",
     # task_queue.py
-    "Перетащите файлы сюда": "Drag files here",
+    "Перетащите файлы или папки сюда": "Drag files or folders here",
     "или нажмите кнопку, чтобы выбрать вручную": "or click the button to choose manually",
     "Выбрать файлы": "Choose files",
+    "Выбрать папку": "Choose folder",
     # file_row.py
     "Изображение": "Image",
     "Аудио": "Audio",

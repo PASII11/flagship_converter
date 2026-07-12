@@ -10,6 +10,7 @@ from flagship_converter.ui import theme
 
 class CommandBar(QFrame):
     add_files_clicked = Signal()
+    add_folder_clicked = Signal()
     folder_clicked = Signal()
     convert_clicked = Signal()
     cancel_clicked = Signal()
@@ -29,6 +30,10 @@ class CommandBar(QFrame):
         self._add_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._add_btn.clicked.connect(self.add_files_clicked.emit)
 
+        self._add_folder_btn = QPushButton(t("Добавить папку"))
+        self._add_folder_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._add_folder_btn.clicked.connect(self.add_folder_clicked.emit)
+
         self._folder_btn = QPushButton(t("converted/ рядом с исходником"))
         self._folder_btn.setCursor(Qt.CursorShape.PointingHandCursor)
         self._folder_btn.clicked.connect(self.folder_clicked.emit)
@@ -46,6 +51,7 @@ class CommandBar(QFrame):
         self._cancel_btn.clicked.connect(self.cancel_clicked.emit)
 
         row.addWidget(self._add_btn)
+        row.addWidget(self._add_folder_btn)
         row.addWidget(self._folder_btn)
         row.addStretch()
         row.addWidget(self._convert_btn)
@@ -72,11 +78,12 @@ class CommandBar(QFrame):
     def set_converting(self, converting: bool) -> None:
         self._convert_btn.setVisible(not converting)
         self._cancel_btn.setVisible(converting)
-        for w in (self._add_btn, self._folder_btn):
+        for w in (self._add_btn, self._add_folder_btn, self._folder_btn):
             w.setEnabled(not converting)
 
     def retranslate(self) -> None:
         self._add_btn.setText(t("Добавить файлы"))
+        self._add_folder_btn.setText(t("Добавить папку"))
         self._update_convert_text()
         self._cancel_btn.setText(t("Отменить"))
 
@@ -84,6 +91,7 @@ class CommandBar(QFrame):
         p = p or theme.palette()
         self.setStyleSheet(theme.panel_qss("CommandBar", p))
         self._add_btn.setStyleSheet(theme.secondary_button_qss(p))
+        self._add_folder_btn.setStyleSheet(theme.secondary_button_qss(p))
         self._folder_btn.setStyleSheet(theme.ghost_button_qss(p))
         self._convert_btn.setStyleSheet(theme.primary_button_qss(p))
         self._cancel_btn.setStyleSheet(theme.ghost_button_qss(p, danger=True))
