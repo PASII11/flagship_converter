@@ -13,6 +13,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from flagship_converter.core.expand import ExpandedFile
 from flagship_converter.core.models import JobStatus
 from flagship_converter.i18n import t
 from flagship_converter.ui import theme
@@ -82,14 +83,19 @@ class TaskQueue(QWidget):
         return frame
 
 
-    def add_files(self, paths: list[str | Path]) -> int:
+    def add_files(self, paths: list[str | Path | ExpandedFile]) -> int:
         existing = {r.file_path.resolve() for r in self._rows.values()}
         added = 0
         for raw in paths:
-            p = Path(raw).resolve()
-            if p in existing or not p.is_file():
+            item = raw if isinstance(raw, ExpandedFile) else ExpandedFile(path=Path(raw))
+            p = item.path.resolve()
+            if p in existing or not item.path.is_file():
                 continue
-            row = FileRow(p, default_video_codec=self.default_video_codec)
+            row = FileRow(
+                p,
+                default_video_codec=self.default_video_codec,
+                rel_subdir=item.rel_subdir,
+            )
             row.set_presets(self._presets)
             row.remove_requested.connect(self._on_remove)
             row.format_changed.connect(

@@ -98,3 +98,28 @@ def test_retranslate_updates_empty_state(app, tmp_path):
     q.retranslate()
     assert q._empty_title.text() == "Drag files here"
     assert q._empty_btn.text() == "Choose files"
+
+
+def test_add_expanded_files_with_rel(app, tmp_path):
+    from flagship_converter.core.expand import ExpandedFile
+
+    root = tmp_path / "photos"
+    root.mkdir()
+    f = root / "a.jpg"
+    f.write_bytes(b"x")
+    q = TaskQueue()
+    assert q.add_files([ExpandedFile(path=f, source_root=root)]) == 1
+    assert q.rows()[0].rel_subdir == Path("photos")
+
+
+def test_re_drop_file_from_added_folder_dedupes(app, tmp_path):
+    from flagship_converter.core.expand import ExpandedFile
+
+    root = tmp_path / "photos"
+    root.mkdir()
+    f = root / "a.jpg"
+    f.write_bytes(b"x")
+    q = TaskQueue()
+    q.add_files([ExpandedFile(path=f, source_root=root)])
+    assert q.add_files([f]) == 0
+    assert q.count() == 1
