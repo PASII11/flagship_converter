@@ -124,10 +124,14 @@ class ConverterPage(QWidget):
                 return
         had_dirs = any(Path(p).is_dir() for p in paths)
         from_dirs = any(e.source_root is not None for e in expanded)
-        self._queue.add_files(expanded)
-        if had_dirs and not from_dirs:
+        added = self._queue.add_files(expanded)
+        if had_dirs and not from_dirs and added == 0:
             self._footer_label.setText(
                 t("В папке не найдено поддерживаемых файлов")
+            )
+        elif added:
+            self._footer_label.setText(
+                t("Добавьте файлы или папки, или перетащите их в окно")
             )
 
     def apply_preset_by_id(self, preset_id: str) -> None:

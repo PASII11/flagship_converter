@@ -153,3 +153,15 @@ def test_large_drop_requires_confirmation(page, tmp_path, monkeypatch):
     )
     page.add_files([str(root)])
     assert page._queue.count() == 0
+
+
+def test_footer_warning_cleared_after_successful_add(page, tmp_path):
+    root = tmp_path / "docs_only"
+    root.mkdir()
+    (root / "readme.txt").write_bytes(b"x")
+    page.add_files([str(root)])
+    assert page._footer_label.text() == "В папке не найдено поддерживаемых файлов"
+    f = tmp_path / "a.jpg"
+    f.write_bytes(b"x")
+    page.add_files([str(f)])
+    assert page._footer_label.text() == "Добавьте файлы или папки, или перетащите их в окно"
