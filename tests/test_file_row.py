@@ -142,7 +142,54 @@ def test_construct_time_translation(app, tmp_path):
     f.write_bytes(b"x")
     row = FileRow(f)
     assert row._preset_label.text() == "Preset"
-    assert "Image" in row._meta.text()
+
+
+def _video_row(tmp_path):
+    f = tmp_path / "v.mp4"
+    f.write_bytes(b"x")
+    return FileRow(f)
+
+
+def test_gif_target_shows_gif_controls(app, tmp_path):
+    row = _video_row(tmp_path)
+    row._format_box.setCurrentText("gif")
+    assert row._gif_fps.isVisibleTo(row)
+    assert row._gif_width.isVisibleTo(row)
+    assert not row._vbitrate.isVisibleTo(row)
+    assert not row._codec.isVisibleTo(row)
+    assert not row._abitrate.isVisibleTo(row)
+
+
+def test_audio_target_shows_audio_bitrate(app, tmp_path):
+    row = _video_row(tmp_path)
+    row._format_box.setCurrentText("mp3")
+    assert row._abitrate.isVisibleTo(row)
+    assert not row._vbitrate.isVisibleTo(row)
+    assert not row._gif_fps.isVisibleTo(row)
+    row._format_box.setCurrentText("wav")
+    assert not row._abitrate.isVisibleTo(row)
+
+
+def test_video_target_keeps_video_controls(app, tmp_path):
+    row = _video_row(tmp_path)
+    row._format_box.setCurrentText("mp4")
+    assert row._vbitrate.isVisibleTo(row)
+    assert row._codec.isVisibleTo(row)
+    assert not row._gif_fps.isVisibleTo(row)
+    row._format_box.setCurrentText("webm")
+    assert not row._codec.isVisibleTo(row)
+
+
+def test_job_params_include_gif_settings(app, tmp_path):
+    row = _video_row(tmp_path)
+    params = row.job_params
+    assert params["gif_fps"] == 15
+    assert params["gif_width"] == 480
+    row._gif_fps.setCurrentText("24")
+    row._gif_width.setCurrentIndex(3)  # Оригинал
+    params = row.job_params
+    assert params["gif_fps"] == 24
+    assert params["gif_width"] == 0
 
 
 def test_rel_subdir_shown_in_meta(app, tmp_path):

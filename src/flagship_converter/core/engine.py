@@ -126,6 +126,8 @@ class ConversionEngine:
             "audio_bitrate": audio_bitrate,
             "video_bitrate": video_bitrate,
             "video_codec": video_codec,
+            "gif_fps": 15,
+            "gif_width": 480,
         }
         for file_path in files:
             job = self.build_job(

@@ -29,3 +29,11 @@ def test_invalid_language_code_falls_back_to_russian():
 def test_format_placeholders_survive_translation():
     i18n.set_language("en")
     assert i18n.t("Готово {done}").format(done=3) == "Done 3"
+
+
+def test_video_gif_keys_translated():
+    from flagship_converter.i18n import _TRANSLATIONS
+
+    for key in ("Частота кадров", "Ширина", "Оригинал"):
+        assert key in _TRANSLATIONS
+        assert _TRANSLATIONS[key]

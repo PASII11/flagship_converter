@@ -19,6 +19,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from flagship_converter.core.converters.video import AUDIO_TARGETS as VIDEO_AUDIO_TARGETS
 from flagship_converter.core.models import JobStatus
 from flagship_converter.i18n import t
 from flagship_converter.ui import theme
@@ -33,7 +34,7 @@ DOC_EXTS = {".pdf", ".docx", ".md"}
 OUTPUT_FORMATS: dict[str, list[str]] = {
     "image": ["webp", "jpg", "png", "bmp", "tiff"],
     "audio": ["mp3", "wav", "flac", "aac", "ogg"],
-    "video": ["mp4", "mkv", "avi", "webm"],
+    "video": ["mp4", "mkv", "avi", "webm", "gif", "mp3", "wav", "flac", "aac", "ogg"],
     "doc": ["pdf", "docx", "md"],
 }
 
@@ -219,11 +220,25 @@ class FileRow(QFrame):
         for codec_id in VIDEO_CODEC_IDS:
             self._codec.addItem(t(VIDEO_CODEC_LABELS[codec_id]), codec_id)
         self._codec.currentTextChanged.connect(self._mark_override)
+        self._gif_fps_label = QLabel(t("Частота кадров"))
+        self._gif_fps = QComboBox()
+        self._gif_fps.addItems(["10", "15", "20", "24"])
+        self._gif_fps.setCurrentText("15")
+        self._gif_fps.currentTextChanged.connect(self._mark_override)
+        self._gif_width_label = QLabel(t("Ширина"))
+        self._gif_width = QComboBox()
+        for label, value in (("320 px", 320), ("480 px", 480), ("640 px", 640)):
+            self._gif_width.addItem(label, value)
+        self._gif_width.addItem(t("Оригинал"), 0)
+        self._gif_width.setCurrentIndex(1)
+        self._gif_width.currentIndexChanged.connect(self._mark_override)
         for w in (
             self._quality_label, self._quality,
             self._abitrate_label, self._abitrate,
             self._vbitrate_label, self._vbitrate,
             self._codec_label, self._codec,
+            self._gif_fps_label, self._gif_fps,
+            self._gif_width_label, self._gif_width,
         ):
             params.addWidget(w)
         self._reset_btn = QPushButton(t("Сбросить к пресету"))
@@ -269,17 +284,24 @@ class FileRow(QFrame):
         is_img = self.category == "image"
         is_audio = self.category == "audio"
         is_video = self.category == "video"
+        video_to_audio = is_video and fmt in VIDEO_AUDIO_TARGETS
+        video_to_gif = is_video and fmt == "gif"
+        video_to_video = is_video and not video_to_audio and not video_to_gif
         show_q = is_img and fmt != "png"
-        show_a = is_audio and fmt not in ("wav", "flac")
+        show_a = (is_audio or video_to_audio) and fmt not in ("wav", "flac")
         self._quality_label.setVisible(show_q)
         self._quality.setVisible(show_q)
         self._abitrate_label.setVisible(show_a)
         self._abitrate.setVisible(show_a)
-        self._vbitrate_label.setVisible(is_video)
-        self._vbitrate.setVisible(is_video)
-        show_codec = is_video and fmt != "webm"
+        self._vbitrate_label.setVisible(video_to_video)
+        self._vbitrate.setVisible(video_to_video)
+        show_codec = video_to_video and fmt != "webm"
         self._codec_label.setVisible(show_codec)
         self._codec.setVisible(show_codec)
+        self._gif_fps_label.setVisible(video_to_gif)
+        self._gif_fps.setVisible(video_to_gif)
+        self._gif_width_label.setVisible(video_to_gif)
+        self._gif_width.setVisible(video_to_gif)
 
     def _on_user_format(self, fmt: str) -> None:
         self._sync_param_visibility(fmt)
@@ -369,6 +391,8 @@ class FileRow(QFrame):
             "audio_bitrate": self._abitrate.currentText(),
             "video_bitrate": self._vbitrate.currentText(),
             "video_codec": self._codec.currentData(),
+            "gif_fps": int(self._gif_fps.currentText()),
+            "gif_width": int(self._gif_width.currentData()),
         }
 
     def is_convertible(self) -> bool:
@@ -416,7 +440,7 @@ class FileRow(QFrame):
         for w in (
             self._format_box, self._quality, self._abitrate,
             self._vbitrate, self._codec, self._reset_btn,
-            self._preset_box,
+            self._preset_box, self._gif_fps, self._gif_width,
         ):
             w.setEnabled(enabled)
         self._remove_btn.setEnabled(not locked)
@@ -440,6 +464,9 @@ class FileRow(QFrame):
             self._abitrate_label.setText(t("Битрейт аудио"))
             self._vbitrate_label.setText(t("Битрейт видео"))
             self._codec_label.setText(t("Кодек"))
+            self._gif_fps_label.setText(t("Частота кадров"))
+            self._gif_width_label.setText(t("Ширина"))
+            self._gif_width.setItemText(3, t("Оригинал"))
             for i, codec_id in enumerate(VIDEO_CODEC_IDS):
                 self._codec.setItemText(i, t(VIDEO_CODEC_LABELS[codec_id]))
             self._reset_btn.setText(t("Сбросить к пресету"))
@@ -473,11 +500,15 @@ class FileRow(QFrame):
         self._format_box.setStyleSheet(theme.input_qss(p))
         self._preset_box.setStyleSheet(theme.input_qss(p))
         self._preset_label.setStyleSheet(theme.text_style(p.text_secondary, 12, 400))
-        for w in (self._quality, self._abitrate, self._vbitrate, self._codec):
+        for w in (
+            self._quality, self._abitrate, self._vbitrate, self._codec,
+            self._gif_fps, self._gif_width,
+        ):
             w.setStyleSheet(theme.input_qss(p))
         for lbl in (
             self._quality_label, self._abitrate_label,
             self._vbitrate_label, self._codec_label,
+            self._gif_fps_label, self._gif_width_label,
         ):
             lbl.setStyleSheet(theme.text_style(p.text_secondary, 12, 400))
         self._error_label.setStyleSheet(theme.text_style(p.error, 12, 400))
