@@ -26,13 +26,16 @@ from flagship_converter.ui import theme
 from flagship_converter.ui.presets import Preset
 from flagship_converter.ui.video_codecs import VIDEO_CODEC_IDS, VIDEO_CODEC_LABELS
 
-IMAGE_EXTS = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif", ".gif"}
+IMAGE_EXTS = {
+    ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif", ".gif",
+    ".heic", ".heif", ".avif",
+}
 AUDIO_EXTS = {".mp3", ".wav", ".flac", ".aac", ".m4a", ".ogg", ".wma"}
 VIDEO_EXTS = {".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv", ".m4v"}
 DOC_EXTS = {".pdf", ".docx", ".md"}
 
 OUTPUT_FORMATS: dict[str, list[str]] = {
-    "image": ["webp", "jpg", "png", "bmp", "tiff"],
+    "image": ["webp", "avif", "jpg", "png", "bmp", "tiff"],
     "audio": ["mp3", "wav", "flac", "aac", "ogg"],
     "video": ["mp4", "mkv", "avi", "webm", "gif", "mp3", "wav", "flac", "aac", "ogg"],
     "doc": ["pdf", "docx", "md"],

@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QApplication
 
 from flagship_converter.core.models import JobStatus
 from flagship_converter.ui.presets import Preset
-from flagship_converter.ui.widgets.file_row import FileRow, get_category
+from flagship_converter.ui.widgets.file_row import FileRow, get_category, OUTPUT_FORMATS
 
 
 @pytest.fixture(scope="module")
@@ -220,3 +220,13 @@ def test_retranslate_keeps_rel_prefix(app, tmp_path):
     i18n.set_language("en")
     row.retranslate()
     assert row._meta.text().startswith("photos · Image")
+
+
+def test_heic_and_avif_are_image_category():
+    assert get_category(Path("x.heic")) == "image"
+    assert get_category(Path("x.heif")) == "image"
+    assert get_category(Path("x.avif")) == "image"
+
+
+def test_avif_in_image_output_formats():
+    assert "avif" in OUTPUT_FORMATS["image"]
