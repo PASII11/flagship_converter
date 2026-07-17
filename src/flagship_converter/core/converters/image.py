@@ -5,13 +5,19 @@ from __future__ import annotations
 from collections.abc import Callable
 from pathlib import Path
 
-from PIL import Image, UnidentifiedImageError
+from PIL import Image, ImageOps, UnidentifiedImageError
+from pillow_heif import register_heif_opener
 
 from flagship_converter.core.converters.base import safe_output_path
 from flagship_converter.i18n import t
 
-SUPPORTED_INPUT = {".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif", ".gif"}
-SUPPORTED_OUTPUT = {"png", "jpg", "jpeg", "webp", "bmp", "tiff"}
+register_heif_opener()
+
+SUPPORTED_INPUT = {
+    ".png", ".jpg", ".jpeg", ".webp", ".bmp", ".tiff", ".tif", ".gif",
+    ".heic", ".heif", ".avif",
+}
+SUPPORTED_OUTPUT = {"png", "jpg", "jpeg", "webp", "bmp", "tiff", "avif"}
 
 
 class ImageConverter:
@@ -60,6 +66,7 @@ class ImageConverter:
         try:
             img: Image.Image = Image.open(input_path)
             with img:
+                img = ImageOps.exif_transpose(img)
                 save_kwargs: dict[str, int | bool] = {}
 
                 if target_ext in ("jpg", "jpeg"):
@@ -78,6 +85,10 @@ class ImageConverter:
                         quality = max(1, min(quality, 95))
                         save_kwargs = {"quality": quality}
 
+                elif target_ext == "avif":
+                    quality = max(1, min(quality, 95))
+                    save_kwargs = {"quality": quality}
+
                 output_path.parent.mkdir(parents=True, exist_ok=True)
 
                 fmt_map = {
@@ -87,6 +98,7 @@ class ImageConverter:
                     "webp": "WEBP",
                     "bmp": "BMP",
                     "tiff": "TIFF",
+                    "avif": "AVIF",
                 }
                 pil_format = fmt_map.get(target_ext, target_ext.upper())
                 img.save(str(output_path), format=pil_format, **save_kwargs)

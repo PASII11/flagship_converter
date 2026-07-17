@@ -12,6 +12,7 @@ dependencies = [
     "pdfkit>=1.0.0",
     "pyinstaller>=6.19.0",
     "pdf2docx>=0.5.13",
+    "pillow-heif>=1.4.0",
 ]
 
 [project.optional-dependencies]

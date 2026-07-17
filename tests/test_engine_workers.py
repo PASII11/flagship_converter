@@ -45,3 +45,8 @@ def test_build_job_routes_video_to_audio_targets(tmp_path):
         assert job is not None
         assert job.converter == "VideoConverter"
         assert job.output_path.suffix == f".{target}"
+
+
+def test_supported_inputs_include_heic_and_avif():
+    exts = ConversionEngine().supported_input_extensions()
+    assert {".heic", ".heif", ".avif"} <= exts
