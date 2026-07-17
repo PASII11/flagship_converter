@@ -142,6 +142,7 @@ def test_construct_time_translation(app, tmp_path):
     f.write_bytes(b"x")
     row = FileRow(f)
     assert row._preset_label.text() == "Preset"
+    assert "Image" in row._meta.text()
 
 
 def _video_row(tmp_path):
