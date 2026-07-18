@@ -37,3 +37,11 @@ def test_video_gif_keys_translated():
     for key in ("Частота кадров", "Ширина", "Оригинал"):
         assert key in _TRANSLATIONS
         assert _TRANSLATIONS[key]
+
+
+def test_target_size_keys_translated():
+    from flagship_converter.i18n import _TRANSLATIONS
+
+    for key in ("Размер", "Не ограничен", "{n} МБ", "Свой…", " МБ"):
+        assert key in _TRANSLATIONS
+        assert _TRANSLATIONS[key]

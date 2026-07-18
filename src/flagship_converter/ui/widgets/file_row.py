@@ -235,6 +235,19 @@ class FileRow(QFrame):
         self._gif_width.addItem(t("Оригинал"), 0)
         self._gif_width.setCurrentIndex(1)
         self._gif_width.currentIndexChanged.connect(self._mark_override)
+        self._size_label = QLabel(t("Размер"))
+        self._size_box = QComboBox()
+        self._size_box.addItem(t("Не ограничен"), 0)
+        for mb in (8, 25, 50):
+            self._size_box.addItem(t("{n} МБ").format(n=mb), mb)
+        self._size_box.addItem(t("Свой…"), -1)
+        self._size_box.currentIndexChanged.connect(self._on_size_changed)
+        self._size_spin = QSpinBox()
+        self._size_spin.setButtonSymbols(QSpinBox.ButtonSymbols.NoButtons)
+        self._size_spin.setRange(1, 4096)
+        self._size_spin.setValue(25)
+        self._size_spin.setSuffix(t(" МБ"))
+        self._size_spin.valueChanged.connect(self._mark_override)
         for w in (
             self._quality_label, self._quality,
             self._abitrate_label, self._abitrate,
@@ -242,6 +255,7 @@ class FileRow(QFrame):
             self._codec_label, self._codec,
             self._gif_fps_label, self._gif_fps,
             self._gif_width_label, self._gif_width,
+            self._size_label, self._size_box, self._size_spin,
         ):
             params.addWidget(w)
         self._reset_btn = QPushButton(t("Сбросить к пресету"))
@@ -296,8 +310,14 @@ class FileRow(QFrame):
         self._quality.setVisible(show_q)
         self._abitrate_label.setVisible(show_a)
         self._abitrate.setVisible(show_a)
-        self._vbitrate_label.setVisible(video_to_video)
-        self._vbitrate.setVisible(video_to_video)
+        size_selected = video_to_video and self._size_box.currentData() != 0
+        self._size_label.setVisible(video_to_video)
+        self._size_box.setVisible(video_to_video)
+        self._size_spin.setVisible(
+            video_to_video and self._size_box.currentData() == -1
+        )
+        self._vbitrate_label.setVisible(video_to_video and not size_selected)
+        self._vbitrate.setVisible(video_to_video and not size_selected)
         show_codec = video_to_video and fmt != "webm"
         self._codec_label.setVisible(show_codec)
         self._codec.setVisible(show_codec)
@@ -318,6 +338,10 @@ class FileRow(QFrame):
     def _mark_override(self, *_args: object) -> None:
         if not self._applying:
             self._overridden = True
+
+    def _on_size_changed(self, _index: int) -> None:
+        self._mark_override()
+        self._sync_param_visibility(self._format_box.currentText())
 
     def set_target_format(self, ext: str) -> None:
         if ext not in OUTPUT_FORMATS.get(self.category, []):
@@ -387,6 +411,13 @@ class FileRow(QFrame):
         return self._output_path
 
     @property
+    def target_size_mb(self) -> int:
+        data = self._size_box.currentData()
+        if data == -1:
+            return int(self._size_spin.value())
+        return int(data)
+
+    @property
     def job_params(self) -> dict[str, object]:
         return {
             "quality": self._quality.value(),
@@ -396,6 +427,7 @@ class FileRow(QFrame):
             "video_codec": self._codec.currentData(),
             "gif_fps": int(self._gif_fps.currentText()),
             "gif_width": int(self._gif_width.currentData()),
+            "target_size_mb": self.target_size_mb,
         }
 
     def is_convertible(self) -> bool:
@@ -444,6 +476,7 @@ class FileRow(QFrame):
             self._format_box, self._quality, self._abitrate,
             self._vbitrate, self._codec, self._reset_btn,
             self._preset_box, self._gif_fps, self._gif_width,
+            self._size_box, self._size_spin,
         ):
             w.setEnabled(enabled)
         self._remove_btn.setEnabled(not locked)
@@ -470,6 +503,14 @@ class FileRow(QFrame):
             self._gif_fps_label.setText(t("Частота кадров"))
             self._gif_width_label.setText(t("Ширина"))
             self._gif_width.setItemText(3, t("Оригинал"))
+            self._size_label.setText(t("Размер"))
+            self._size_box.setItemText(self._size_box.findData(0), t("Не ограничен"))
+            for mb in (8, 25, 50):
+                self._size_box.setItemText(
+                    self._size_box.findData(mb), t("{n} МБ").format(n=mb)
+                )
+            self._size_box.setItemText(self._size_box.findData(-1), t("Свой…"))
+            self._size_spin.setSuffix(t(" МБ"))
             for i, codec_id in enumerate(VIDEO_CODEC_IDS):
                 self._codec.setItemText(i, t(VIDEO_CODEC_LABELS[codec_id]))
             self._reset_btn.setText(t("Сбросить к пресету"))
@@ -505,13 +546,14 @@ class FileRow(QFrame):
         self._preset_label.setStyleSheet(theme.text_style(p.text_secondary, 12, 400))
         for w in (
             self._quality, self._abitrate, self._vbitrate, self._codec,
-            self._gif_fps, self._gif_width,
+            self._gif_fps, self._gif_width, self._size_box, self._size_spin,
         ):
             w.setStyleSheet(theme.input_qss(p))
         for lbl in (
             self._quality_label, self._abitrate_label,
             self._vbitrate_label, self._codec_label,
             self._gif_fps_label, self._gif_width_label,
+            self._size_label,
         ):
             lbl.setStyleSheet(theme.text_style(p.text_secondary, 12, 400))
         self._error_label.setStyleSheet(theme.text_style(p.error, 12, 400))

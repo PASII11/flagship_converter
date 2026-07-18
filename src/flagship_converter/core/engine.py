@@ -128,6 +128,7 @@ class ConversionEngine:
             "video_codec": video_codec,
             "gif_fps": 15,
             "gif_width": 480,
+            "target_size_mb": 0,
         }
         for file_path in files:
             job = self.build_job(

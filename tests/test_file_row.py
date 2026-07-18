@@ -230,3 +230,31 @@ def test_heic_and_avif_are_image_category():
 
 def test_avif_in_image_output_formats():
     assert "avif" in OUTPUT_FORMATS["image"]
+
+
+def test_size_combo_visible_only_for_video_targets(app, tmp_path):
+    row = _video_row(tmp_path)
+    row._format_box.setCurrentText("mp4")
+    assert row._size_box.isVisibleTo(row)
+    assert not row._size_spin.isVisibleTo(row)
+    row._format_box.setCurrentText("gif")
+    assert not row._size_box.isVisibleTo(row)
+    row._format_box.setCurrentText("mp3")
+    assert not row._size_box.isVisibleTo(row)
+
+
+def test_size_preset_hides_manual_bitrate(app, tmp_path):
+    row = _video_row(tmp_path)
+    assert row._vbitrate.isVisibleTo(row)
+    assert row.job_params["target_size_mb"] == 0
+    row._size_box.setCurrentIndex(row._size_box.findData(8))
+    assert not row._vbitrate.isVisibleTo(row)
+    assert row.job_params["target_size_mb"] == 8
+
+
+def test_custom_size_uses_spinbox(app, tmp_path):
+    row = _video_row(tmp_path)
+    row._size_box.setCurrentIndex(row._size_box.findData(-1))
+    assert row._size_spin.isVisibleTo(row)
+    row._size_spin.setValue(123)
+    assert row.job_params["target_size_mb"] == 123
