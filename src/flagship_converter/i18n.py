@@ -106,6 +106,10 @@ _TRANSLATIONS: dict[str, str] = {
     "Не удалось открыть изображение: {name}": "Failed to open image: {name}",
     "Ошибка при сохранении {name}: {error}": "Error while saving {name}: {error}",
     "Не удалось открыть stderr процесса FFmpeg": "Failed to open FFmpeg process stderr",
+    "Не удалось определить длительность видео": "Failed to detect video duration",
+    "Целевой размер слишком мал для этой длительности": (
+        "Target size is too small for this duration"
+    ),
 }
 
 _current_language = "ru"

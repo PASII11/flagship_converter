@@ -178,3 +178,37 @@ def audio_encode_args(target_ext: str, audio_bitrate: str) -> list[str]:
     if target_ext == "wav":
         return ["-c:a", "pcm_s16le"]
     return ["-b:a", audio_bitrate]
+
+
+SIZE_BITRATE_FLOOR_BPS = 100_000
+SIZE_CONTAINER_MARGIN = 0.95
+
+
+def probe_duration_seconds(input_path: Path) -> float:
+    """Длительность видео из заголовка: ffmpeg -i пишет Duration в stderr."""
+    creationflags = 0
+    if sys.platform == "win32":
+        creationflags = getattr(subprocess, "CREATE_NO_WINDOW", 0x08000000)
+    result = subprocess.run(
+        [get_ffmpeg_path(), "-i", str(input_path)],
+        capture_output=True,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        creationflags=creationflags,
+    )
+    match = DURATION_RE.search(result.stderr or "")
+    if not match:
+        raise RuntimeError(t("Не удалось определить длительность видео"))
+    return _time_to_seconds(match["hours"], match["minutes"], match["seconds"])
+
+
+def compute_size_bitrate(target_mb: int, duration_s: float, audio_bps: int) -> int:
+    """Видео-битрейт для попадания в целевой размер; 5% запас на контейнер."""
+    if duration_s <= 0:
+        raise RuntimeError(t("Не удалось определить длительность видео"))
+    budget_bits = target_mb * 8 * 1024 * 1024 * SIZE_CONTAINER_MARGIN
+    video_bps = int(budget_bits / duration_s) - audio_bps
+    if video_bps < SIZE_BITRATE_FLOOR_BPS:
+        raise RuntimeError(t("Целевой размер слишком мал для этой длительности"))
+    return video_bps
