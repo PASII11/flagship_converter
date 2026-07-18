@@ -8,13 +8,17 @@ from pathlib import Path
 from flagship_converter.core.converters.base import safe_output_path
 from flagship_converter.core.converters.media import (
     audio_encode_args,
+    compute_size_bitrate,
     get_ffmpeg_path,
+    probe_duration_seconds,
     run_ffmpeg,
 )
 
 SUPPORTED_INPUT = {".mp4", ".mkv", ".avi", ".mov", ".webm", ".flv", ".m4v"}
 AUDIO_TARGETS = {"mp3", "wav", "flac", "aac", "ogg"}
 SUPPORTED_OUTPUT = {"mp4", "mkv", "avi", "webm", "gif"} | AUDIO_TARGETS
+
+SIZE_AUDIO_BPS = 128_000
 
 
 class VideoConverter:
@@ -57,11 +61,23 @@ class VideoConverter:
 
         video_bitrate = str(params.get("video_bitrate", "2.5M"))
         codec_id = str(params.get("video_codec", "auto"))
+        target_size_mb = int(params.get("target_size_mb", 0))
+
+        size_args: list[str] = []
+        aac_args = ["-c:a", "aac", "-b:a", "192k"]
+        opus_args = ["-c:a", "libopus"]
+        if target_size_mb > 0:
+            duration = probe_duration_seconds(input_path)
+            video_bps = compute_size_bitrate(target_size_mb, duration, SIZE_AUDIO_BPS)
+            video_bitrate = str(video_bps)
+            size_args = ["-maxrate", str(video_bps), "-bufsize", str(video_bps * 2)]
+            aac_args = ["-c:a", "aac", "-b:a", "128k"]
+            opus_args = ["-c:a", "libopus", "-b:a", "128k"]
 
         cmd = [get_ffmpeg_path(), "-y", "-i", str(input_path)]
 
         if target_ext == "webm":
-            cmd.extend(["-c:v", "libvpx-vp9", "-b:v", video_bitrate, "-c:a", "libopus"])
+            cmd.extend(["-c:v", "libvpx-vp9", "-b:v", video_bitrate, *size_args, *opus_args])
         else:
             if codec_id == "amd":
                 vcodec = "h264_amf"
@@ -72,7 +88,7 @@ class VideoConverter:
             else:
                 vcodec = "libx264"
 
-            cmd.extend(["-c:v", vcodec, "-b:v", video_bitrate, "-c:a", "aac", "-b:a", "192k"])
+            cmd.extend(["-c:v", vcodec, "-b:v", video_bitrate, *size_args, *aac_args])
 
         cmd.append(str(output_path))
         run_ffmpeg(cmd, cancel_cb, progress_cb)

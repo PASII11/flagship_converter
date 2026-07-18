@@ -124,3 +124,40 @@ def test_gif_palette_removed_on_error(tmp_path, monkeypatch):
     with pytest.raises(RuntimeError):
         conv.convert(src, out, {}, lambda: False, None)
     assert not out.with_suffix(".palette.png").exists()
+
+
+@pytest.fixture()
+def fixed_duration(monkeypatch):
+    monkeypatch.setattr(video_mod, "probe_duration_seconds", lambda _p: 10.0)
+
+
+def test_target_size_computes_bitrate(ffmpeg_calls, fixed_duration, tmp_path):
+    _convert(tmp_path, "mp4", {"target_size_mb": 8})
+    (cmd,) = ffmpeg_calls
+    assert cmd[cmd.index("-b:v") + 1] == "6247342"
+    assert cmd[cmd.index("-maxrate") + 1] == "6247342"
+    assert cmd[cmd.index("-bufsize") + 1] == "12494684"
+    assert cmd[cmd.index("-b:a") + 1] == "128k"
+
+
+def test_target_size_webm_uses_opus_128k(ffmpeg_calls, fixed_duration, tmp_path):
+    _convert(tmp_path, "webm", {"target_size_mb": 8})
+    (cmd,) = ffmpeg_calls
+    assert cmd[cmd.index("-c:a") + 1] == "libopus"
+    assert cmd[cmd.index("-b:a") + 1] == "128k"
+    assert "-maxrate" in cmd
+
+
+def test_target_size_too_small_raises(ffmpeg_calls, tmp_path, monkeypatch):
+    monkeypatch.setattr(video_mod, "probe_duration_seconds", lambda _p: 36000.0)
+    with pytest.raises(RuntimeError):
+        _convert(tmp_path, "mp4", {"target_size_mb": 8})
+    assert ffmpeg_calls == []
+
+
+def test_no_target_size_keeps_manual_bitrate(ffmpeg_calls, tmp_path):
+    _convert(tmp_path, "mp4", {"video_bitrate": "5M"})
+    (cmd,) = ffmpeg_calls
+    assert cmd[cmd.index("-b:v") + 1] == "5M"
+    assert "-maxrate" not in cmd
+    assert cmd[cmd.index("-b:a") + 1] == "192k"
