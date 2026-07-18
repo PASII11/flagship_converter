@@ -76,8 +76,14 @@ class VideoConverter:
 
         cmd = [get_ffmpeg_path(), "-y", "-i", str(input_path)]
 
+        # 10-битные источники (HDR/камеры) не принимаются HW-энкодерами H264;
+        # принудительный 8-битный 4:2:0 также гарантирует совместимость плееров.
+        pix_args = ["-pix_fmt", "yuv420p"]
+
         if target_ext == "webm":
-            cmd.extend(["-c:v", "libvpx-vp9", "-b:v", video_bitrate, *size_args, *opus_args])
+            cmd.extend(
+                ["-c:v", "libvpx-vp9", "-b:v", video_bitrate, *size_args, *pix_args, *opus_args]
+            )
         else:
             if codec_id == "amd":
                 vcodec = "h264_amf"
@@ -88,7 +94,7 @@ class VideoConverter:
             else:
                 vcodec = "libx264"
 
-            cmd.extend(["-c:v", vcodec, "-b:v", video_bitrate, *size_args, *aac_args])
+            cmd.extend(["-c:v", vcodec, "-b:v", video_bitrate, *size_args, *pix_args, *aac_args])
 
         cmd.append(str(output_path))
         run_ffmpeg(cmd, cancel_cb, progress_cb)

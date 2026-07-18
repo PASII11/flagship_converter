@@ -161,3 +161,16 @@ def test_no_target_size_keeps_manual_bitrate(ffmpeg_calls, tmp_path):
     assert cmd[cmd.index("-b:v") + 1] == "5M"
     assert "-maxrate" not in cmd
     assert cmd[cmd.index("-b:a") + 1] == "192k"
+
+
+def test_video_output_forces_8bit_pixel_format(ffmpeg_calls, tmp_path):
+    _convert(tmp_path, "mp4", {"video_codec": "amd"})
+    (cmd,) = ffmpeg_calls
+    assert cmd[cmd.index("-c:v") + 1] == "h264_amf"
+    assert cmd[cmd.index("-pix_fmt") + 1] == "yuv420p"
+
+
+def test_webm_output_forces_8bit_pixel_format(ffmpeg_calls, tmp_path):
+    _convert(tmp_path, "webm", {})
+    (cmd,) = ffmpeg_calls
+    assert cmd[cmd.index("-pix_fmt") + 1] == "yuv420p"
