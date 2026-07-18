@@ -6,7 +6,7 @@ from PySide6.QtWidgets import QApplication
 
 from flagship_converter.core.models import JobStatus
 from flagship_converter.ui.presets import Preset
-from flagship_converter.ui.widgets.file_row import FileRow, get_category, OUTPUT_FORMATS
+from flagship_converter.ui.widgets.file_row import OUTPUT_FORMATS, FileRow, get_category
 
 
 @pytest.fixture(scope="module")
