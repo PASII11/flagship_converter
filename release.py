@@ -96,6 +96,12 @@ def check_preconditions(version: str) -> None:
     ).stdout.strip()
     if remote_tags:
         raise ReleaseError(f"Тег {tag} уже есть на origin — поднимите версию")
+    on_remote = subprocess.run(
+        ["git", "branch", "-r", "--contains", "HEAD"],
+        capture_output=True, text=True, check=True,
+    ).stdout.strip()
+    if not on_remote:
+        raise ReleaseError("HEAD не запушен на origin — выполните git push")
     find_iscc()
     find_gh()
     auth = subprocess.run(["gh", "auth", "status"], capture_output=True, text=True)
@@ -136,14 +142,19 @@ def write_checksums(artifacts: list[Path]) -> Path:
 
 def publish(version: str, artifacts: list[Path], notes: str) -> None:
     tag = f"v{version}"
-    run(["git", "tag", tag])
-    run(["git", "push", "origin", tag])
+    head = subprocess.run(
+        ["git", "rev-parse", "HEAD"], capture_output=True, text=True, check=True
+    ).stdout.strip()
+    # Тег создаёт сам gh вместе с релизом: при ошибке не остаётся
+    # полуопубликованного состояния, повторный запуск безопасен.
     run([
         "gh", "release", "create", tag,
         *artifacts,
+        "--target", head,
         "--title", f"Flagship Converter {version}",
         "--notes", notes,
     ])
+    run(["git", "fetch", "--tags", "origin"])
 
 
 def main() -> None:
