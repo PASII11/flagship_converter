@@ -17,6 +17,7 @@ _TRANSLATIONS: dict[str, str] = {
     "Тема": "Theme",
     "Дождитесь завершения текущей конвертации": "Wait for the current conversion to finish",
     "Отпустите, чтобы добавить файлы": "Drop to add files",
+    "Доступно обновление {version}": "Update available {version}",
     # settings_page.py
     "Папка вывода": "Output folder",
     "converted/ рядом с исходником": "converted/ next to the source file",

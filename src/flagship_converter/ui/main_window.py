@@ -1,8 +1,13 @@
 """Главное окно: топ-бар с навигацией и стек страниц."""
 from __future__ import annotations
 
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QDragEnterEvent, QDropEvent
+from PySide6.QtCore import Qt, QUrl
+from PySide6.QtGui import (
+    QCloseEvent,
+    QDesktopServices,
+    QDragEnterEvent,
+    QDropEvent,
+)
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -15,6 +20,7 @@ from PySide6.QtWidgets import (
 )
 
 from flagship_converter.core.engine import ConversionEngine
+from flagship_converter.core.update_checker import RELEASES_PAGE_URL, UpdateChecker
 from flagship_converter.i18n import set_language, t
 from flagship_converter.ui import theme
 from flagship_converter.ui.pages.converter_page import ConverterPage
@@ -39,6 +45,7 @@ class MainWindow(QMainWindow):
         settings: AppSettings | None = None,
         store: PresetStore | None = None,
         engine: ConversionEngine | None = None,
+        check_updates: bool = True,
     ) -> None:
         super().__init__()
         self.setWindowTitle("Flagship File Converter")
@@ -56,6 +63,12 @@ class MainWindow(QMainWindow):
         self._settings.changed.connect(self._on_settings_changed)
         self._connect_system_theme_listener()
         self._apply_theme()
+
+        self._update_checker: UpdateChecker | None = None
+        if check_updates:
+            self._update_checker = UpdateChecker(self)
+            self._update_checker.update_available.connect(self._show_update_button)
+            self._update_checker.start()
 
     def _build_ui(self) -> None:
         root = QWidget()
@@ -92,6 +105,14 @@ class MainWindow(QMainWindow):
             bar.addWidget(btn)
         bar.addStretch()
 
+        self._update_tag: str | None = None
+        self._update_btn = QPushButton()
+        self._update_btn.setFixedHeight(34)
+        self._update_btn.setCursor(Qt.CursorShape.PointingHandCursor)
+        self._update_btn.clicked.connect(self._open_releases_page)
+        self._update_btn.hide()
+        bar.addWidget(self._update_btn)
+
         self._theme_btn = QPushButton()
         self._theme_btn.setFixedHeight(34)
         self._theme_btn.setCursor(Qt.CursorShape.PointingHandCursor)
@@ -120,6 +141,17 @@ class MainWindow(QMainWindow):
         self._settings.theme_mode = _THEME_CYCLE.get(
             self._settings.theme_mode, "system"
         )
+
+    def _show_update_button(self, tag: str) -> None:
+        self._update_tag = tag
+        self._update_btn.setText(
+            t("Доступно обновление {version}").format(version=tag)
+        )
+        self._update_btn.setStyleSheet(theme.primary_button_qss(theme.palette()))
+        self._update_btn.show()
+
+    def _open_releases_page(self) -> None:
+        QDesktopServices.openUrl(QUrl(RELEASES_PAGE_URL))
 
     def _apply_preset_and_go(self, preset_id: str) -> None:
         self._converter.apply_preset_by_id(preset_id)
@@ -162,6 +194,7 @@ class MainWindow(QMainWindow):
             t(_THEME_TITLES.get(self._settings.theme_mode, "Тема"))
         )
         self._theme_btn.setStyleSheet(theme.secondary_button_qss(p))
+        self._update_btn.setStyleSheet(theme.primary_button_qss(p))
         self._style_nav()
         self._converter.apply_theme(p)
         self._presets_page.apply_theme(p)
@@ -171,6 +204,10 @@ class MainWindow(QMainWindow):
         for index, btn in enumerate(self._nav_buttons):
             btn.setText(t(_NAV_TITLES[index]))
         self._theme_btn.setToolTip(t("Переключить тему"))
+        if self._update_tag is not None:
+            self._update_btn.setText(
+                t("Доступно обновление {version}").format(version=self._update_tag)
+            )
         self._converter.retranslate()
         self._presets_page.retranslate()
         self._settings_page.retranslate()
@@ -181,6 +218,12 @@ class MainWindow(QMainWindow):
         for index, btn in enumerate(self._nav_buttons):
             btn.setStyleSheet(theme.nav_button_qss(index == current, p))
 
+    def closeEvent(self, event: QCloseEvent) -> None:
+        # Поток живёт максимум ~таймаут запроса (5 с); дожидаемся, чтобы Qt
+        # не уничтожил работающий QThread.
+        if self._update_checker is not None and self._update_checker.isRunning():
+            self._update_checker.wait(7000)
+        super().closeEvent(event)
 
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:
         if event.mimeData().hasUrls():

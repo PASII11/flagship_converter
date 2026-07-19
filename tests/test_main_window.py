@@ -24,6 +24,7 @@ def window(app, tmp_path):
         settings=AppSettings(qs),
         store=PresetStore(tmp_path / "p.json"),
         engine=ConversionEngine(),
+        check_updates=False,
     )
 
 
@@ -56,3 +57,28 @@ def test_language_change_retranslates_nav(window):
     assert window._nav_buttons[2].text() == "Settings"
     window._settings.language = "ru"
     assert window._nav_buttons[0].text() == "Конвертер"
+
+
+def test_update_button_hidden_initially(window):
+    assert window._update_btn.isHidden()
+    assert window._update_checker is None  # check_updates=False — сети нет
+
+
+def test_update_button_appears_with_version(window):
+    window._show_update_button("v9.9.9")
+    assert not window._update_btn.isHidden()
+    assert "v9.9.9" in window._update_btn.text()
+
+
+def test_update_button_opens_releases_page(window, monkeypatch):
+    from PySide6.QtGui import QDesktopServices
+
+    from flagship_converter.core.update_checker import RELEASES_PAGE_URL
+
+    opened = []
+    monkeypatch.setattr(
+        QDesktopServices, "openUrl", lambda url: opened.append(url.toString()) or True
+    )
+    window._show_update_button("v9.9.9")
+    window._update_btn.click()
+    assert opened == [RELEASES_PAGE_URL]
