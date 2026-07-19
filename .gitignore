@@ -11,3 +11,9 @@ wheels/
 
 # IDE
 .idea/
+
+# Скачанные модели docling (кладёт build.py, >1 ГБ)
+build_tools/docling_models/
+
+# Артефакты релиза (release.py)
+release/

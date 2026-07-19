@@ -7,6 +7,7 @@ import sys
 from PySide6.QtWidgets import QApplication
 
 from flagship_converter.ui.main_window import MainWindow
+from flagship_converter.version import __version__
 
 
 def main() -> None:
@@ -18,7 +19,7 @@ def main() -> None:
     app.setStyle("Fusion")
 
     app.setApplicationName("Flagship File Converter")
-    app.setApplicationVersion("1.0.0")
+    app.setApplicationVersion(__version__)
 
     window = MainWindow()
     window.show()
