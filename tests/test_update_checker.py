@@ -81,3 +81,38 @@ class TestFetchLatestTag:
             uc.urllib.request, "urlopen", lambda *a, **k: _FakeResponse(body)
         )
         assert uc.fetch_latest_tag() is None
+
+
+class TestUpdateChecker:
+    def test_emits_when_newer(self, monkeypatch):
+        from PySide6.QtWidgets import QApplication
+
+        QApplication.instance() or QApplication([])
+        monkeypatch.setattr(uc, "fetch_latest_tag", lambda: "v99.0.0")
+        checker = uc.UpdateChecker()
+        received: list[str] = []
+        checker.update_available.connect(received.append)
+        checker._worker()  # синхронно: сигнал доставляется напрямую
+        assert received == ["v99.0.0"]
+
+    def test_silent_when_not_newer(self, monkeypatch):
+        from PySide6.QtWidgets import QApplication
+
+        QApplication.instance() or QApplication([])
+        monkeypatch.setattr(uc, "fetch_latest_tag", lambda: "v0.0.1")
+        checker = uc.UpdateChecker()
+        received: list[str] = []
+        checker.update_available.connect(received.append)
+        checker._worker()
+        assert received == []
+
+    def test_silent_when_fetch_fails(self, monkeypatch):
+        from PySide6.QtWidgets import QApplication
+
+        QApplication.instance() or QApplication([])
+        monkeypatch.setattr(uc, "fetch_latest_tag", lambda: None)
+        checker = uc.UpdateChecker()
+        received: list[str] = []
+        checker.update_available.connect(received.append)
+        checker._worker()
+        assert received == []

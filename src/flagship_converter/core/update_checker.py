@@ -7,9 +7,10 @@ rate limit, битый JSON) молча трактуется как «обнов
 from __future__ import annotations
 
 import json
+import threading
 import urllib.request
 
-from PySide6.QtCore import QThread, Signal
+from PySide6.QtCore import QObject, Signal
 
 from flagship_converter.version import __version__
 
@@ -54,12 +55,24 @@ def fetch_latest_tag() -> str | None:
     return tag if isinstance(tag, str) and tag else None
 
 
-class UpdateChecker(QThread):
-    """Фоновая проверка: эмитит update_available(tag), только если есть новее."""
+class UpdateChecker(QObject):
+    """Фоновая проверка: эмитит update_available(tag), только если есть новее.
+
+    Работает в daemon-потоке Python: при выходе из приложения поток
+    умирает вместе с процессом, Qt-объекты не ждут его завершения.
+    """
 
     update_available = Signal(str)
 
-    def run(self) -> None:
+    def start(self) -> None:
+        threading.Thread(target=self._worker, daemon=True).start()
+
+    def _worker(self) -> None:
         tag = fetch_latest_tag()
-        if tag is not None and is_newer(tag):
+        if tag is None or not is_newer(tag):
+            return
+        try:
             self.update_available.emit(tag)
+        except RuntimeError:
+            # Окно (и C++-часть этого объекта) уже уничтожены — молча выходим.
+            pass

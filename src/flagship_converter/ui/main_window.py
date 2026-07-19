@@ -2,12 +2,7 @@
 from __future__ import annotations
 
 from PySide6.QtCore import Qt, QUrl
-from PySide6.QtGui import (
-    QCloseEvent,
-    QDesktopServices,
-    QDragEnterEvent,
-    QDropEvent,
-)
+from PySide6.QtGui import QDesktopServices, QDragEnterEvent, QDropEvent
 from PySide6.QtWidgets import (
     QApplication,
     QHBoxLayout,
@@ -217,13 +212,6 @@ class MainWindow(QMainWindow):
         current = self._stack.currentIndex()
         for index, btn in enumerate(self._nav_buttons):
             btn.setStyleSheet(theme.nav_button_qss(index == current, p))
-
-    def closeEvent(self, event: QCloseEvent) -> None:
-        # Поток живёт максимум ~таймаут запроса (5 с); дожидаемся, чтобы Qt
-        # не уничтожил работающий QThread.
-        if self._update_checker is not None and self._update_checker.isRunning():
-            self._update_checker.wait(7000)
-        super().closeEvent(event)
 
     def dragEnterEvent(self, event: QDragEnterEvent) -> None:
         if event.mimeData().hasUrls():
