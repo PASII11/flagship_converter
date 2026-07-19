@@ -1,4 +1,5 @@
 """Flagship File Converter — локальный конвертер файлов флагманского уровня."""
 
-__version__: str = "0.1.0"
+from flagship_converter.version import __version__
+
 __author__: str = "Flagship Team"

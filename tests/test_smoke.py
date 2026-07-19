@@ -13,7 +13,8 @@ from PIL import Image
 
 def test_import_package() -> None:
     import flagship_converter
-    assert flagship_converter.__version__ == "0.1.0"
+    import flagship_converter.version
+    assert flagship_converter.__version__ == flagship_converter.version.__version__
 
 
 def test_import_app_main() -> None:
