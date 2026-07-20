@@ -17,3 +17,6 @@ build_tools/docling_models/
 
 # Артефакты релиза (release.py)
 release/
+
+# Генерируется PyInstaller при каждой сборке (машинно-зависимые пути)
+FlagshipConverter.spec
