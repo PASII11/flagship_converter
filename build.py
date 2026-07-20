@@ -51,6 +51,20 @@ def _ensure_docling_models(build_dir: Path) -> Path:
     return models_dir
 
 
+def _prune_model_junk(models_dir: Path) -> None:
+    """Удалить служебный мусор загрузчика HuggingFace и неиспользуемые модели.
+
+    .cache/huggingface хранит блокировки и недокачанные файлы с именами
+    длиннее MAX_PATH — они роняют компиляцию Inno Setup. CodeFormulaV2
+    приложением не используется (code/formula enrichment не включаются).
+    """
+    for cache_dir in list(models_dir.rglob(".cache")):
+        shutil.rmtree(cache_dir, ignore_errors=True)
+    for leftover in list(models_dir.rglob("*.incomplete")):
+        leftover.unlink(missing_ok=True)
+    shutil.rmtree(models_dir / "docling-project--CodeFormulaV2", ignore_errors=True)
+
+
 def main() -> None:
     build_dir = Path("build_tools")
     build_dir.mkdir(exist_ok=True)
@@ -69,6 +83,7 @@ def main() -> None:
 
     rapid_dir = _package_dir("rapidocr")
     docling_models_dir = _ensure_docling_models(build_dir)
+    _prune_model_junk(docling_models_dir)
 
     cmd = [
         sys.executable,
