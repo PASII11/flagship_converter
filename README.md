@@ -1,45 +1,43 @@
 # Flagship Converter
 
 Privacy-first file converter for Windows. Everything runs locally on your
-machine — no uploads, no accounts, no telemetry.
+machine: no uploads, no accounts, no telemetry.
 
 ![Flagship Converter](docs/assets/screenshot.png)
 
 ## Features
 
-- **Images** — convert PNG, JPEG, WebP, BMP, TIFF, AVIF (opens HEIC/HEIF and
+- **Images:** convert PNG, JPEG, WebP, BMP, TIFF and AVIF (opens HEIC/HEIF and
   GIF too), with per-file quality control.
-- **Video** — convert MP4, MKV, AVI, MOV, WebM, FLV, M4V; compress to an exact
-  target file size (fit any upload limit), extract audio (MP3, WAV, FLAC, AAC,
-  OGG) or turn clips into GIFs.
-- **Audio** — convert MP3, WAV, FLAC, AAC, M4A, OGG, WMA.
-- **Documents** — PDF ↔ DOCX ↔ Markdown with layout-aware parsing and built-in
-  OCR, so scanned PDFs work too.
-- **Batch queue** — drop files or whole folders, convert in parallel, per-file
-  settings and reusable presets.
-- **Desktop-grade UX** — light/dark theme, English and Russian interface.
+- **Video:** convert MP4, MKV, AVI, MOV, WebM, FLV and M4V, compress a video to
+  an exact file size, extract audio (MP3, WAV, FLAC, AAC, OGG) or turn clips
+  into GIFs.
+- **Audio:** convert MP3, WAV, FLAC, AAC, M4A, OGG and WMA.
+- **Documents:** convert between PDF, DOCX and Markdown with layout-aware
+  parsing and built-in OCR, so scanned PDFs work too.
+- **Batch queue:** drop in files or whole folders, convert in parallel, tweak
+  settings per file and save presets you use often.
+- **Interface:** light and dark themes, English and Russian.
 
 ## Download
 
-Get the latest version from the
+Grab the latest version from the
 [Releases page](https://github.com/PASII11/flagship_converter/releases/latest):
 
-| File | What it is |
-| --- | --- |
-| `FlagshipConverter-Setup-<version>.exe` | Installer — recommended. Start menu shortcut, in-place upgrades, uninstaller. |
-| `FlagshipConverter-<version>-portable-win64.zip` | Portable build — unzip anywhere and run `FlagshipConverter.exe`. |
+- `FlagshipConverter-Setup-<version>.exe` if you just want to install and go.
+- `FlagshipConverter-<version>-portable-win64.zip` if you prefer to unzip it
+  anywhere and run it without installing.
 
-**System requirements:** Windows 10/11 x64, ~3 GB of free disk space. FFmpeg,
-OCR models and document parsers are bundled — nothing else to install.
+Works on Windows 10/11 x64 and takes about 3 GB of disk space. Everything the
+app needs (FFmpeg, OCR models, document parsers) is already inside.
 
-On startup the app makes a single anonymous request to GitHub to check for a
-new release and shows an "Update available" button if there is one. Nothing is
-ever sent anywhere.
+On startup the app checks GitHub for a new release and shows an "Update
+available" button when there is one. Your files never leave your machine.
 
 ## Build from source
 
-Requires [uv](https://docs.astral.sh/uv/), plus `ffmpeg` and `wkhtmltopdf`
-available on `PATH`.
+You need [uv](https://docs.astral.sh/uv/), plus `ffmpeg` and `wkhtmltopdf`
+on `PATH`.
 
 ```bash
 uv sync
@@ -47,9 +45,6 @@ uv run python -m pytest                    # run tests
 uv run python -m flagship_converter.app    # run from source
 uv run python build.py                     # build dist/FlagshipConverter
 ```
-
-Releases are built with `uv run python release.py` (needs Inno Setup 6 and an
-authenticated gh CLI).
 
 ## License
 
