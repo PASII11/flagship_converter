@@ -24,6 +24,8 @@ ISS_SCRIPT = REPO_ROOT / "packaging" / "installer.iss"
 _ISCC_DEFAULTS = [
     Path(r"C:\Program Files (x86)\Inno Setup 6\ISCC.exe"),
     Path(r"C:\Program Files\Inno Setup 6\ISCC.exe"),
+    # Per-user установка (winget по умолчанию ставит в профиль).
+    Path.home() / "AppData" / "Local" / "Programs" / "Inno Setup 6" / "ISCC.exe",
 ]
 
 
