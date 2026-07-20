@@ -32,6 +32,11 @@ Name: "russian"; MessagesFile: "compiler:Languages\Russian.isl"
 [Tasks]
 Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
 
+; При обновлении поверх старой версии вычищаем прежний рантайм,
+; чтобы не оставались устаревшие DLL.
+[InstallDelete]
+Type: filesandordirs; Name: "{app}\_internal"
+
 [Files]
 Source: "..\dist\FlagshipConverter\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
