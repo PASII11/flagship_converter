@@ -116,3 +116,20 @@ class TestUpdateChecker:
         checker.update_available.connect(received.append)
         checker._worker()
         assert received == []
+
+    def test_thread_is_daemon(self, monkeypatch):
+        from PySide6.QtWidgets import QApplication
+
+        QApplication.instance() or QApplication([])
+        captured: dict = {}
+
+        class _FakeThread:
+            def __init__(self, *args, **kwargs):
+                captured.update(kwargs)
+
+            def start(self):
+                pass
+
+        monkeypatch.setattr(uc.threading, "Thread", _FakeThread)
+        uc.UpdateChecker().start()
+        assert captured.get("daemon") is True
