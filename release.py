@@ -109,11 +109,26 @@ def check_preconditions(version: str) -> None:
         raise ReleaseError("gh не авторизован — выполните: gh auth login")
 
 
-def build_app() -> None:
+def build_app(version: str) -> None:
     run([sys.executable, "build.py"])
     exe = DIST_DIR / "FlagshipConverter.exe"
     if not exe.exists():
         raise ReleaseError(f"Сборка не создала {exe}")
+    (DIST_DIR / "version.txt").write_text(version + "\n", encoding="utf-8")
+
+
+def check_dist_stamp(dist_dir: Path, version: str) -> None:
+    """Убедиться, что dist собран из текущей версии (метка version.txt)."""
+    stamp = dist_dir / "version.txt"
+    if not stamp.exists():
+        raise ReleaseError(
+            "В dist нет метки version.txt — соберите заново без --skip-build"
+        )
+    found = stamp.read_text(encoding="utf-8").strip()
+    if found != version:
+        raise ReleaseError(
+            f"dist собран из версии {found}, а релиз — {version}: пересоберите без --skip-build"
+        )
 
 
 def make_zip(version: str) -> Path:
@@ -179,9 +194,11 @@ def main() -> None:
 
     RELEASE_DIR.mkdir(exist_ok=True)
     if not args.skip_build:
-        build_app()
-    elif not (DIST_DIR / "FlagshipConverter.exe").exists():
-        raise ReleaseError("--skip-build указан, но dist/FlagshipConverter не найден")
+        build_app(version)
+    else:
+        if not (DIST_DIR / "FlagshipConverter.exe").exists():
+            raise ReleaseError("--skip-build указан, но dist/FlagshipConverter не найден")
+        check_dist_stamp(DIST_DIR, version)
 
     zip_path = make_zip(version)
     installer = make_installer(version)
